@@ -3,7 +3,7 @@ import { z } from "zod";
 // Config tools schemas
 export const GetConfigArgsSchema = z.object({
   origin: z.enum(['ui', 'llm']).optional(),
-}).passthrough().optional().default({});
+}).passthrough();
 
 export const SetConfigValueArgsSchema = z.object({
   key: z.string(),
@@ -18,7 +18,7 @@ export const SetConfigValueArgsSchema = z.object({
 }).passthrough();
 
 // Empty schemas
-export const ListProcessesArgsSchema = z.object({}).passthrough().optional().default({});
+export const ListProcessesArgsSchema = z.object({}).passthrough();
 
 // Terminal tools schemas
 export const StartProcessArgsSchema = z.object({
@@ -43,7 +43,7 @@ export const ForceTerminateArgsSchema = z.object({
   pid: z.number(),
 });
 
-export const ListSessionsArgsSchema = z.object({}).passthrough().optional().default({});
+export const ListSessionsArgsSchema = z.object({}).passthrough();
 
 export const KillProcessArgsSchema = z.object({
   pid: z.number(),

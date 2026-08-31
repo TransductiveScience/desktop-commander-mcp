@@ -2,10 +2,8 @@ import { z } from "zod";
 
 // Config tools schemas
 export const GetConfigArgsSchema = z.object({
-  // 'ui' marks calls the config-editor widget fires programmatically; they are
-  // excluded from tool-call telemetry (see isUiOriginCall in server.ts).
   origin: z.enum(['ui', 'llm']).optional(),
-});
+}).passthrough().optional().default({});
 
 export const SetConfigValueArgsSchema = z.object({
   key: z.string(),
@@ -16,12 +14,11 @@ export const SetConfigValueArgsSchema = z.object({
     z.array(z.string()),
     z.null(),
   ]),
-  // 'ui' marks widget-fired calls; excluded from tool-call telemetry.
   origin: z.enum(['ui', 'llm']).optional(),
-});
+}).passthrough();
 
 // Empty schemas
-export const ListProcessesArgsSchema = z.object({});
+export const ListProcessesArgsSchema = z.object({}).passthrough().optional().default({});
 
 // Terminal tools schemas
 export const StartProcessArgsSchema = z.object({
@@ -46,7 +43,7 @@ export const ForceTerminateArgsSchema = z.object({
   pid: z.number(),
 });
 
-export const ListSessionsArgsSchema = z.object({});
+export const ListSessionsArgsSchema = z.object({}).passthrough().optional().default({});
 
 export const KillProcessArgsSchema = z.object({
   pid: z.number(),

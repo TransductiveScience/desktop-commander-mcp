@@ -105,6 +105,9 @@ export async function runHttpServer(): Promise<void> {
 
             if (req.method === 'POST') {
                 const body = await readJsonBody(req);
+                const method = (body as any)?.method;
+                const toolName = (body as any)?.params?.name;
+                process.stderr.write(`[Desktop Commander HTTP] Request: method=${method}${toolName ? ` tool=${toolName}` : ''}\n`);
                 await router.handlePost(req, res, body);
                 return;
             }

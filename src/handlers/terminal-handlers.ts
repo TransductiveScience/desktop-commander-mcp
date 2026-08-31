@@ -50,6 +50,7 @@ export async function handleForceTerminate(args: unknown): Promise<ServerResult>
 /**
  * Handle list_sessions command
  */
-export async function handleListSessions(): Promise<ServerResult> {
+export async function handleListSessions(args?: unknown): Promise<ServerResult> {
+    ListSessionsArgsSchema.parse(args ?? {});
     return listSessions();
 }

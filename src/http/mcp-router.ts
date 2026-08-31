@@ -95,11 +95,17 @@ export function createMcpHttpRouter(options: McpHttpRouterOptions) {
             return;
         }
 
-        // 3. Modern 2026-07-28 stateless or recovered request -> dispatch statelessly
+        // 3. Modern 2026-07-28 stateless or recovered request -> create per-request stateless server
         try {
-            const stateless = await getOrCreateStateless();
-            await runWithMcpLogSink(logSinkFor(stateless.server), () => stateless.transport.handleRequest(req, res, body));
+            const server = options.createServer();
+            const transport = options.createTransport({
+                onSessionInitialized: () => {},
+                onSessionClosed: () => {},
+            });
+            await server.connect(transport);
+            await runWithMcpLogSink(logSinkFor(server), () => transport.handleRequest(req, res, body));
         } catch (error) {
+            process.stderr.write(`[Desktop Commander HTTP error] ${String(error)}\n`);
             sendJson(res, 500, { jsonrpc: '2.0', error: { code: -32603, message: `Internal server error: ${String(error)}` }, id: null });
         }
     }

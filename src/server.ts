@@ -1345,9 +1345,10 @@ async function handleCallToolRequest(request: CallToolRequest): Promise<ServerRe
                 try {
                     result = await getConfig();
                 } catch (error) {
+                    logger.error(`Error in get_config handler: ${error instanceof Error ? error.stack || error.message : String(error)}`);
                     capture('server_request_error', { message: `Error in get_config handler: ${error}` });
                     result = {
-                        content: [{ type: "text", text: `Error: Failed to get configuration` }],
+                        content: [{ type: "text", text: `Error: Failed to get configuration: ${error instanceof Error ? error.message : String(error)}` }],
                         isError: true,
                     };
                 }
@@ -1476,7 +1477,16 @@ async function handleCallToolRequest(request: CallToolRequest): Promise<ServerRe
                 break;
 
             case "list_sessions":
-                result = await handlers.handleListSessions();
+                try {
+                    result = await handlers.handleListSessions(args);
+                } catch (error) {
+                    logger.error(`Error in list_sessions handler: ${error instanceof Error ? error.stack || error.message : String(error)}`);
+                    capture('server_request_error', { message: `Error in list_sessions handler: ${error}` });
+                    result = {
+                        content: [{ type: "text", text: `Error: Failed to list sessions: ${error instanceof Error ? error.message : String(error)}` }],
+                        isError: true,
+                    };
+                }
                 break;
 
             // Process tools

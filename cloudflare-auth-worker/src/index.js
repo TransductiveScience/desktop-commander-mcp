@@ -1,15 +1,18 @@
-import { PUBLIC_JWK, PRIVATE_JWK } from './keys.js';
+import { PUBLIC_JWK, getPrivateKeyJwk } from './keys.js';
 
 let privateKeyPromise = null;
-async function getPrivateKey() {
+async function getPrivateKey(env) {
   if (!privateKeyPromise) {
-    privateKeyPromise = crypto.subtle.importKey(
-      'jwk',
-      PRIVATE_JWK,
-      { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-      false,
-      ['sign']
-    );
+    const keyJwk = await getPrivateKeyJwk(env);
+    if (keyJwk) {
+      privateKeyPromise = crypto.subtle.importKey(
+        'jwk',
+        keyJwk,
+        { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+        false,
+        ['sign']
+      );
+    }
   }
   return privateKeyPromise;
 }
@@ -37,7 +40,7 @@ function base64UrlDecode(str) {
   return bytes;
 }
 
-async function signJwt(payload, issuer) {
+async function signJwt(payload, issuer, env) {
   const header = {
     alg: 'RS256',
     typ: 'JWT',
@@ -59,7 +62,8 @@ async function signJwt(payload, issuer) {
   const encPayload = base64UrlEncode(new TextEncoder().encode(JSON.stringify(fullPayload)));
   const data = new TextEncoder().encode(`${encHeader}.${encPayload}`);
 
-  const privateKey = await getPrivateKey();
+  const privateKey = await getPrivateKey(env);
+  if (!privateKey) throw new Error('AUTH_PRIVATE_JWK environment binding missing or invalid');
   const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', privateKey, data);
   const encSignature = base64UrlEncode(signature);
 
@@ -254,12 +258,12 @@ export default {
         const accessToken = await signJwt({
           client_id: codeObj.c || 'chatgpt',
           scope: codeObj.s || 'mcp'
-        }, issuer);
+        }, issuer, env);
 
         const refreshToken = await signJwt({
           client_id: codeObj.c || 'chatgpt',
           type: 'refresh'
-        }, issuer);
+        }, issuer, env);
 
         return jsonResponse({
           access_token: accessToken,
@@ -278,7 +282,7 @@ export default {
 
         const accessToken = await signJwt({
           scope: 'mcp'
-        }, issuer);
+        }, issuer, env);
 
         return jsonResponse({
           access_token: accessToken,

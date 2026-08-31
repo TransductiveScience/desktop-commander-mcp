@@ -1,5 +1,4 @@
-#!/usr/bin/env node
-const base=process.env.TEST_MCP_URL||'http://127.0.0.1:3001/mcp';
+const base=process.env.TEST_MCP_URL||'http://127.0.0.1:9180/mcp';
 function parse(text){const d=text.split(/\r?\n/).filter(x=>x.startsWith('data: ')).map(x=>x.slice(6)).join('\n'); return d?JSON.parse(d):null;}
 async function post(body,sid,timeout=40000){
   const h={'content-type':'application/json','accept':'application/json, text/event-stream'}; if(sid)h['mcp-session-id']=sid;
@@ -49,6 +48,23 @@ async function main(){
   const warm=[]; for(let i=0;i<7;i++){r=await post(call(200+i,'read_file',{path:file,offset:0,length:10}),sid); if(r.status!==200||r.payload?.error)throw Error('warm read failed'); warm.push(r.ms);}
   warm.sort((a,b)=>a-b); console.log('WARM_READ_MS',warm.join(','),'MEDIAN',warm[Math.floor(warm.length/2)]);
   const health=await fetch(base.replace(/\/mcp$/,'/healthz'),{signal:AbortSignal.timeout(5000)}).then(x=>x.json()); console.log('HEALTH',JSON.stringify(health));
+
+  // --- MODERN 2026-07-28 STATELESS & RECONNECTION ACCEPTANCE MATRIX ---
+  console.log('TESTING_2026_STATELESS_MATRIX...');
+  
+  // 1. Modern 2026 stateless: consecutive tool calls with NO session header
+  for (let i = 1; i <= 20; i++) {
+    const sr = await post(call(5000 + i, 'read_file', { path: file, offset: 0, length: 10 }), null);
+    if (sr.status !== 200 || sr.payload?.error) throw Error(`stateless call ${i} failed: ${JSON.stringify(sr)}`);
+  }
+  console.log('PASS_STATELESS_NO_SESSION_HEADER_20X');
+
+  // 2. Unknown / Stale Session ID recovery test (must not return 400/500 storm, must recover cleanly)
+  const staleSid = 'stale-vanished-uuid-' + Date.now();
+  const recoverCall = await post(call(6001, 'read_file', { path: file, offset: 0, length: 10 }), staleSid);
+  if (recoverCall.status !== 200 && recoverCall.status !== 404) throw Error(`stale session call returned unexpected status: ${recoverCall.status}`);
+  console.log('PASS_STALE_SESSION_RECOVERY');
+
   await Promise.allSettled(sids.map(del)); console.log('ORDINARY_TOOLS_PASS'); console.log('ACCEPTANCE_PASS');
 }
 main().catch(e=>{console.error('ACCEPTANCE_FAIL',e?.stack||e);process.exit(1);});

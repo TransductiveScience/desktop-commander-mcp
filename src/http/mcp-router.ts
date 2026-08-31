@@ -50,39 +50,58 @@ function logSinkFor(server: McpServerLike): McpLogSink {
 
 export function createMcpHttpRouter(options: McpHttpRouterOptions) {
     const sessions = new Map<string, SessionEntry>();
+    let statelessServer: McpServerLike | null = null;
+    let statelessTransport: McpTransportLike | null = null;
+
+    async function getOrCreateStateless(): Promise<{ server: McpServerLike; transport: McpTransportLike }> {
+        if (!statelessServer || !statelessTransport) {
+            statelessServer = options.createServer();
+            statelessTransport = options.createTransport({
+                onSessionInitialized: () => {},
+                onSessionClosed: () => {},
+            });
+            await statelessServer.connect(statelessTransport);
+        }
+        return { server: statelessServer, transport: statelessTransport };
+    }
 
     async function handlePost(req: IncomingMessage & { auth?: unknown }, res: ServerResponse, body: unknown): Promise<void> {
         const sessionId = requestSessionId(req);
-        if (sessionId) {
-            const entry = sessions.get(sessionId);
-            if (!entry) {
-                sendJson(res, 404, { jsonrpc: '2.0', error: { code: -32000, message: 'Not Found: No session found for that ID' }, id: sessionId });
-                return;
-            }
+        
+        // 1. If explicit session ID provided and exists in session map -> dispatch to session
+        if (sessionId && sessions.has(sessionId)) {
+            const entry = sessions.get(sessionId)!;
             await runWithMcpLogSink(logSinkFor(entry.server), () => entry.transport.handleRequest(req, res, body));
             return;
         }
 
-        if (!options.isInitializeRequest(body)) {
-            sendJson(res, 400, { jsonrpc: '2.0', error: { code: -32000, message: 'Invalid request: Missing session ID' }, id: null });
+        // 2. If legacy initialize request -> create dedicated stateful session
+        if (options.isInitializeRequest(body)) {
+            const server = options.createServer();
+            let transport!: McpTransportLike;
+            transport = options.createTransport({
+                onSessionInitialized: async newSessionId => {
+                    sessions.set(newSessionId, { transport, server });
+                },
+                onSessionClosed: async closedSessionId => {
+                    const entry = sessions.get(closedSessionId);
+                    sessions.delete(closedSessionId);
+                    if (entry) await entry.server.close();
+                },
+            });
+
+            await server.connect(transport);
+            await runWithMcpLogSink(logSinkFor(server), () => transport.handleRequest(req, res, body));
             return;
         }
 
-        const server = options.createServer();
-        let transport!: McpTransportLike;
-        transport = options.createTransport({
-            onSessionInitialized: async newSessionId => {
-                sessions.set(newSessionId, { transport, server });
-            },
-            onSessionClosed: async closedSessionId => {
-                const entry = sessions.get(closedSessionId);
-                sessions.delete(closedSessionId);
-                if (entry) await entry.server.close();
-            },
-        });
-
-        await server.connect(transport);
-        await runWithMcpLogSink(logSinkFor(server), () => transport.handleRequest(req, res, body));
+        // 3. Modern 2026-07-28 stateless or recovered request -> dispatch statelessly
+        try {
+            const stateless = await getOrCreateStateless();
+            await runWithMcpLogSink(logSinkFor(stateless.server), () => stateless.transport.handleRequest(req, res, body));
+        } catch (error) {
+            sendJson(res, 500, { jsonrpc: '2.0', error: { code: -32603, message: `Internal server error: ${String(error)}` }, id: null });
+        }
     }
 
     async function handleSessionRequest(req: IncomingMessage & { auth?: unknown }, res: ServerResponse): Promise<void> {

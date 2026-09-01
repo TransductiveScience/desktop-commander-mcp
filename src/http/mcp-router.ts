@@ -15,6 +15,7 @@ export interface McpTransportLike {
 export interface CreateTransportOptions {
     onSessionInitialized(sessionId: string): void | Promise<void>;
     onSessionClosed(sessionId: string): void | Promise<void>;
+    stateless?: boolean;
 }
 
 export interface McpHttpRouterOptions {
@@ -34,6 +35,11 @@ function sendJson(res: ServerResponse, status: number, value: unknown): void {
 function requestSessionId(req: IncomingMessage): string | undefined {
     const value = req.headers['mcp-session-id'];
     return Array.isArray(value) ? value[0] : value;
+}
+
+function containsInitializeRequest(body: unknown): boolean {
+    if (Array.isArray(body)) return body.some(containsInitializeRequest);
+    return typeof body === 'object' && body !== null && (body as { method?: unknown }).method === 'initialize';
 }
 
 function logSinkFor(server: McpServerLike): McpLogSink {
@@ -59,6 +65,7 @@ export function createMcpHttpRouter(options: McpHttpRouterOptions) {
             statelessTransport = options.createTransport({
                 onSessionInitialized: () => {},
                 onSessionClosed: () => {},
+                stateless: true,
             });
             await statelessServer.connect(statelessTransport);
         }
@@ -75,8 +82,10 @@ export function createMcpHttpRouter(options: McpHttpRouterOptions) {
             return;
         }
 
-        // 2. If legacy initialize request -> create dedicated stateful session
-        if (options.isInitializeRequest(body)) {
+        // 2. Initialize-shaped requests always get a dedicated stateful session.
+        // The structural check preserves sessions for request envelopes the SDK
+        // helper does not yet recognize (for example, a fresh batched request).
+        if (options.isInitializeRequest(body) || containsInitializeRequest(body)) {
             const server = options.createServer();
             let transport!: McpTransportLike;
             transport = options.createTransport({
@@ -95,26 +104,15 @@ export function createMcpHttpRouter(options: McpHttpRouterOptions) {
             return;
         }
 
-        // 3. Modern 2026-07-28 stateless or recovered request -> create per-request stateless server
-        try {
-            const server = options.createServer();
-            let transport!: McpTransportLike;
-            transport = options.createTransport({
-                onSessionInitialized: async newSessionId => {
-                    sessions.set(newSessionId, { transport, server });
-                },
-                onSessionClosed: async closedSessionId => {
-                    const entry = sessions.get(closedSessionId);
-                    sessions.delete(closedSessionId);
-                    if (entry) await entry.server.close();
-                },
-            });
-            await server.connect(transport);
-            await runWithMcpLogSink(logSinkFor(server), () => transport.handleRequest(req, res, body));
-        } catch (error) {
-            process.stderr.write(`[Desktop Commander HTTP error] ${String(error)}\n`);
-            sendJson(res, 500, { jsonrpc: '2.0', error: { code: -32603, message: `Internal server error: ${String(error)}` }, id: null });
+        // 3. Modern stateless request -> reuse a transport without session management.
+        if (!sessionId) {
+            const entry = await getOrCreateStateless();
+            await runWithMcpLogSink(logSinkFor(entry.server), () => entry.transport.handleRequest(req, res, body));
+            return;
         }
+
+        // 4. An ordinary request naming an unknown session is stale by definition.
+        sendJson(res, 404, { jsonrpc: '2.0', error: { code: -32000, message: 'Not Found: No session found for that ID' }, id: sessionId });
     }
 
     async function handleSessionRequest(req: IncomingMessage & { auth?: unknown }, res: ServerResponse): Promise<void> {
@@ -134,7 +132,15 @@ export function createMcpHttpRouter(options: McpHttpRouterOptions) {
     async function cleanup(): Promise<void> {
         const entries = [...sessions.values()];
         sessions.clear();
-        await Promise.allSettled(entries.flatMap(entry => [entry.transport.close(), entry.server.close()]));
+        const statelessEntries = statelessServer && statelessTransport
+            ? [statelessTransport.close(), statelessServer.close()]
+            : [];
+        statelessServer = null;
+        statelessTransport = null;
+        await Promise.allSettled([
+            ...entries.flatMap(entry => [entry.transport.close(), entry.server.close()]),
+            ...statelessEntries,
+        ]);
     }
 
     return { handlePost, handleSessionRequest, cleanup, sessionCount: () => sessions.size };

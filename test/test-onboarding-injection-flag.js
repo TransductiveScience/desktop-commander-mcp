@@ -31,7 +31,10 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DIST_INDEX = path.join(__dirname, '..', 'dist', 'index.js');
 const MARKER = 'NEW USER ONBOARDING REQUIRED';
-const SCENARIO_TIMEOUT_MS = 20000;
+// Full server imports can legitimately take 10-20s on Windows before the
+// controlled feature-flag delay begins. Keep this bounded without making the
+// protocol assertion depend on filesystem/antivirus cold-start speed.
+const SCENARIO_TIMEOUT_MS = 60000;
 
 /**
  * Create a pristine "container" home dir. Config is seeded with telemetry

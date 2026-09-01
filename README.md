@@ -3,6 +3,19 @@
 
 > **Powered by [Transductive Science](https://transductive.org)** — Bridging foundational agentic frameworks, multi-tenant MCP edge runtimes, and autonomous tooling across desktop and cloud ecosystems.
 
+## Reliability improvements in this build
+
+This build strengthens the HTTP connector and Windows deployment path without changing the existing OAuth security model:
+
+* **Reliable direct ChatGPT tool calls** — `src/http/mcp-router.ts` now uses a genuinely stateless MCP transport when a request has no session header, so direct calls such as `get_config`, `list_sessions`, and `start_process` no longer fail with “Server not initialized.”
+* **Durable session routing** — initialize-shaped requests receive a dedicated stateful transport, newly issued session IDs remain bound to that transport, repeated calls reuse the correct server, and genuinely stale IDs return a clean `404`.
+* **Deterministic Windows startup** — `scripts/start-http-server.js` applies HTTP, OAuth, and telemetry settings before loading the runtime, records checkout-local stdout/stderr and fatal diagnostics, and exits cleanly for scheduled-task recovery.
+* **Mechanically verifiable deployments** — every build writes `dist/build-info.json`; `/healthz` reports the Git revision, dirty state, build time, Node version, and SHA-256 hashes for the HTTP router and server artifacts.
+* **More resilient background operation** — the Edge installer selects the system Node.js runtime when available and allows extended scheduled-task restart recovery instead of remaining offline after a short-lived port conflict.
+* **Executable regression coverage** — focused router lifecycle tests and the HTTP acceptance matrix cover stateful initialization, sessionless dispatch, stale-session handling, repeated independent requests, configuration access, session listing, and host command execution.
+
+OAuth 2.0/OIDC, PKCE S256, RS256/JWKS validation, protected-resource metadata, and the existing Cloudflare authorization flow remain intact.
+
 [![Transductive Science](https://img.shields.io/badge/Transductive-Science-7c3aed?style=for-the-badge&logo=cloudflare&logoColor=white)](https://transductive.org)
 [![ChatGPT Ready](https://img.shields.io/badge/ChatGPT-Custom%20App%20%26%20MCP%20Ready-10a37f?style=for-the-badge&logo=openai&logoColor=white)](https://chatgpt.com)
 [![Streamable HTTP](https://img.shields.io/badge/MCP-Streamable%20HTTP%20%2B%20OAuth%202.0-0284c7?style=for-the-badge)](https://modelcontextprotocol.io)

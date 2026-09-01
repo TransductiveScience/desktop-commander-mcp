@@ -1,5 +1,6 @@
 import http, { type IncomingMessage, type ServerResponse } from 'node:http';
 import { randomUUID } from 'node:crypto';
+import fs from 'node:fs';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { createServer } from '../server.js';
@@ -14,6 +15,22 @@ import { createReadinessState, completeReadinessTask, readinessPayload } from '.
 import { renderDashboardHtml } from './dashboard.js';
 
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
+
+interface HttpBuildInfo {
+    revision: string;
+    dirty: boolean;
+    builtAt: string;
+    node: string;
+    artifacts: Record<string, string>;
+}
+
+function loadBuildInfo(): HttpBuildInfo | undefined {
+    try {
+        return JSON.parse(fs.readFileSync(new URL('../build-info.json', import.meta.url), 'utf8')) as HttpBuildInfo;
+    } catch {
+        return undefined;
+    }
+}
 
 function writeJson(res: ServerResponse, status: number, value: unknown): void {
     res.writeHead(status, { 'content-type': 'application/json' });
@@ -47,16 +64,17 @@ export async function runHttpServer(): Promise<void> {
     if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`Invalid DESKTOP_COMMANDER_HTTP_PORT: ${port}`);
 
     const readiness = createReadinessState(['configuration', 'feature-flags']);
+    const buildInfo = loadBuildInfo();
     const authConfig = await loadHttpAuthConfig();
     const router = createMcpHttpRouter({
         createServer: () => createServer(),
         isInitializeRequest,
-    createTransport: ({ onSessionInitialized, onSessionClosed }) => new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => randomUUID(),
-        enableJsonResponse: true,
-        onsessioninitialized: onSessionInitialized,
-        onsessionclosed: onSessionClosed,
-    }),
+        createTransport: ({ onSessionInitialized, onSessionClosed, stateless }) => new StreamableHTTPServerTransport({
+            sessionIdGenerator: stateless ? undefined : () => randomUUID(),
+            enableJsonResponse: true,
+            onsessioninitialized: onSessionInitialized,
+            onsessionclosed: onSessionClosed,
+        }),
     });
 
     const nodeServer = http.createServer(async (req: IncomingMessage & { auth?: HttpAuthInfo }, res) => {
@@ -64,7 +82,7 @@ export async function runHttpServer(): Promise<void> {
             const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
 
             if (req.method === 'GET' && url.pathname === '/healthz') {
-                writeJson(res, 200, { ok: true });
+                writeJson(res, 200, { ok: true, build: buildInfo });
                 return;
             }
             if (req.method === 'GET' && url.pathname === '/readyz') {

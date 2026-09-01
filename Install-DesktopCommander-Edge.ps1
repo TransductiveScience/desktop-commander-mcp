@@ -12,7 +12,8 @@ Write-Host "==========================================================`n" -Foreg
 
 # 1. Check Node.js
 Write-Host "[1/6] Checking Node.js runtime..." -ForegroundColor Yellow
-$nodeExe = (Get-Command node.exe -ErrorAction SilentlyContinue).Source
+$systemNode = Join-Path $env:ProgramFiles 'nodejs\node.exe'
+$nodeExe = if (Test-Path $systemNode) { $systemNode } else { (Get-Command node.exe -ErrorAction SilentlyContinue).Source }
 if (-not $nodeExe) {
     Write-Host "Node.js not found. Please install Node.js (>= 18) from https://nodejs.org" -ForegroundColor Red
     exit 1
@@ -58,7 +59,7 @@ $taskName = "DesktopCommanderMCP"
 $action = New-ScheduledTaskAction -Execute $nodeExe -Argument "`"$scriptDir\scripts\start-http-server.js`"" -WorkingDirectory $scriptDir
 $trigger = New-ScheduledTaskTrigger -AtStartup
 $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
-$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 5 -RestartInterval (New-TimeSpan -Minutes 1)
+$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1)
 
 try {
     Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null

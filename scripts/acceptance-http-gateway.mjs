@@ -1,3 +1,5 @@
+import os from 'node:os';
+
 const base=process.env.TEST_MCP_URL||'http://127.0.0.1:9180/mcp';
 function parse(text){const d=text.split(/\r?\n/).filter(x=>x.startsWith('data: ')).map(x=>x.slice(6)).join('\n'); return d?JSON.parse(d):null;}
 async function post(body,sid,timeout=40000){
@@ -9,17 +11,29 @@ async function post(body,sid,timeout=40000){
 const rpc=(id,method,params={})=>({jsonrpc:'2.0',id,method,params});
 const call=(id,name,args)=>rpc(id,'tools/call',{name,arguments:args});
 const text=r=>r?.payload?.result?.content?.map(x=>x?.text||'').join('\n')||'';
+let activeSessions=[];
 async function init(label){const r=await post(rpc(1,'initialize',{protocolVersion:'2024-11-05',capabilities:{},clientInfo:{name:`accept-${label}`,version:'1'}})); if(r.status!==200||!r.sid||r.payload?.error)throw Error(`init ${label}: ${JSON.stringify(r)}`); return r;}
 async function del(sid){try{await fetch(base,{method:'DELETE',headers:{'mcp-session-id':sid},signal:AbortSignal.timeout(5000)});}catch{}}
 async function main(){
   const inits=await Promise.all(['A','B','C','D','E'].map(init));
   const sids=inits.map(x=>x.sid); if(new Set(sids).size!==5)throw Error('session IDs not unique');
+  activeSessions=sids;
   console.log('SESSIONS',sids.join(' '));
+
+  let required=await post(call(10,'get_config',{origin:'llm'}),sids[0]);
+  if(required.status!==200||required.payload?.error||!text(required))throw Error(`get_config failed: ${JSON.stringify(required)}`);
+  console.log('GET_CONFIG_PASS');
+  required=await post(call(11,'list_sessions',{}),sids[0]);
+  if(required.status!==200||required.payload?.error)throw Error(`list_sessions failed: ${JSON.stringify(required)}`);
+  console.log('LIST_SESSIONS_PASS');
+  required=await post(call(12,'start_process',{command:'hostname',timeout_ms:10000,shell:'cmd.exe'}),sids[0]);
+  if(required.status!==200||required.payload?.error||!text(required).toLowerCase().includes(os.hostname().toLowerCase()))throw Error(`start_process(hostname) failed: ${JSON.stringify(required)}`);
+  console.log('START_PROCESS_HOSTNAME_PASS',os.hostname());
+
   const jobs=[];
   for(let s=0;s<5;s++)for(let id=1;id<=3;id++){
-    const token=`S${s+1}-ID${id}`; const delay=50+((s*3+id)%5)*90;
-    const command=`powershell -NoProfile -Command "Write-Output ${token}; Start-Sleep -Milliseconds ${delay}"`;
-    jobs.push(post(call(id,'start_process',{command,timeout_ms:6000}),sids[s]).then(r=>({s,id,token,r})));
+    const token=`S${s+1}-ID${id}`;
+    jobs.push(post(call(id,'start_process',{command:`echo ${token}`,timeout_ms:10000,shell:'cmd.exe'}),sids[s]).then(r=>({s,id,token,r})));
   }
   const out=await Promise.all(jobs);
   for(let i=0;i<out.length;i++){
@@ -36,7 +50,7 @@ async function main(){
   let r=await post(call(100,'write_file',{path:file,content:'desktop-commander-gateway-ok\n',mode:'rewrite'}),sid); if(r.status!==200||r.payload?.error)throw Error('write_file failed');
   r=await post(call(101,'read_file',{path:file,offset:0,length:10}),sid); if(r.status!==200||!text(r).includes('desktop-commander-gateway-ok'))throw Error('read_file failed');
   r=await post(call(102,'list_directory',{path:'C:\\Windows\\Temp',depth:1}),sid); if(r.status!==200||r.payload?.error)throw Error('list_directory failed');
-  r=await post(call(103,'start_process',{command:'powershell -NoProfile -Command "Write-Output PROC-OK; Start-Sleep -Seconds 3; Write-Output PROC-DONE"',timeout_ms:1200}),sid);
+  r=await post(call(103,'start_process',{command:'echo PROC-OK & ping -n 4 127.0.0.1 >nul & echo PROC-DONE',timeout_ms:1200,shell:'cmd.exe'}),sid);
   const m=text(r).match(/PID\s+(\d+)/i); if(!m)throw Error(`start_process PID missing: ${text(r)}`); const pid=Number(m[1]);
   await new Promise(x=>setTimeout(x,3500));
   let procText='';
@@ -65,6 +79,6 @@ async function main(){
   if (recoverCall.status !== 200 && recoverCall.status !== 404) throw Error(`stale session call returned unexpected status: ${recoverCall.status}`);
   console.log('PASS_STALE_SESSION_RECOVERY');
 
-  await Promise.allSettled(sids.map(del)); console.log('ORDINARY_TOOLS_PASS'); console.log('ACCEPTANCE_PASS');
+  await Promise.allSettled(sids.map(del)); activeSessions=[]; console.log('ORDINARY_TOOLS_PASS'); console.log('ACCEPTANCE_PASS');
 }
-main().catch(e=>{console.error('ACCEPTANCE_FAIL',e?.stack||e);process.exit(1);});
+main().catch(async e=>{await Promise.allSettled(activeSessions.map(del));console.error('ACCEPTANCE_FAIL',e?.stack||e);process.exit(1);});

@@ -16,7 +16,9 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DIST_INDEX = path.join(__dirname, '..', 'dist', 'index.js');
-const TIMEOUT_MS = 20_000;
+// Allow for Windows cold-start module loading while keeping a hard bound on
+// the initialize handshake exercised by this integration test.
+const TIMEOUT_MS = 60_000;
 
 class ExistingConfigClaudeCodeMigrationTest {
   constructor() {

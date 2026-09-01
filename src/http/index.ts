@@ -51,12 +51,12 @@ export async function runHttpServer(): Promise<void> {
     const router = createMcpHttpRouter({
         createServer: () => createServer(),
         isInitializeRequest,
-        createTransport: ({ onSessionInitialized, onSessionClosed }) => new StreamableHTTPServerTransport({
-            sessionIdGenerator: () => randomUUID(),
-            enableJsonResponse: true,
-            onsessioninitialized: onSessionInitialized,
-            onsessionclosed: onSessionClosed,
-        }),
+    createTransport: ({ onSessionInitialized, onSessionClosed }) => new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => randomUUID(),
+        enableJsonResponse: true,
+        onsessioninitialized: onSessionInitialized,
+        onsessionclosed: onSessionClosed,
+    }),
     });
 
     const nodeServer = http.createServer(async (req: IncomingMessage & { auth?: HttpAuthInfo }, res) => {

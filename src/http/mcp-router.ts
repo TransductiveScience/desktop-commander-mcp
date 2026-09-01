@@ -98,9 +98,16 @@ export function createMcpHttpRouter(options: McpHttpRouterOptions) {
         // 3. Modern 2026-07-28 stateless or recovered request -> create per-request stateless server
         try {
             const server = options.createServer();
-            const transport = options.createTransport({
-                onSessionInitialized: () => {},
-                onSessionClosed: () => {},
+            let transport!: McpTransportLike;
+            transport = options.createTransport({
+                onSessionInitialized: async newSessionId => {
+                    sessions.set(newSessionId, { transport, server });
+                },
+                onSessionClosed: async closedSessionId => {
+                    const entry = sessions.get(closedSessionId);
+                    sessions.delete(closedSessionId);
+                    if (entry) await entry.server.close();
+                },
             });
             await server.connect(transport);
             await runWithMcpLogSink(logSinkFor(server), () => transport.handleRequest(req, res, body));

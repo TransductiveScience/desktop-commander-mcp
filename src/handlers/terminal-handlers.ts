@@ -7,8 +7,6 @@ import {
 } from '../tools/improved-process-tools.js';
 
 import { 
-    StartProcessArgsSchema,
-    ReadProcessOutputArgsSchema,
     InteractWithProcessArgsSchema,
     ForceTerminateArgsSchema,
     ListSessionsArgsSchema
@@ -20,16 +18,14 @@ import { ServerResult } from '../types.js';
  * Handle start_process command (improved execute_command)
  */
 export async function handleStartProcess(args: unknown): Promise<ServerResult> {
-    const parsed = StartProcessArgsSchema.parse(args);
-    return startProcess(parsed);
+    return startProcess(args);
 }
 
 /**
  * Handle read_process_output command (improved read_output)
  */
 export async function handleReadProcessOutput(args: unknown): Promise<ServerResult> {
-    const parsed = ReadProcessOutputArgsSchema.parse(args);
-    return readProcessOutput(parsed);
+    return readProcessOutput(args);
 }
 
 /**

@@ -13,6 +13,7 @@ import { loadHttpAuthConfig, authorizeHttpRequest, protectedResourceMetadata, ty
 import { resolvePublicBaseUrl, resolvePublicMcpUrl } from './public-url.js';
 import { createReadinessState, completeReadinessTask, readinessPayload } from './readiness.js';
 import { renderDashboardHtml } from './dashboard.js';
+import { runWithHttpRequestContext } from './request-context.js';
 
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
 
@@ -35,6 +36,14 @@ function loadBuildInfo(): HttpBuildInfo | undefined {
 function writeJson(res: ServerResponse, status: number, value: unknown): void {
     res.writeHead(status, { 'content-type': 'application/json' });
     res.end(JSON.stringify(value));
+}
+
+function safePublicErrorCause(error: unknown): string {
+    const raw = error instanceof Error ? error.message : String(error);
+    return raw
+        .replace(/(authorization:\s*bearer\s+)\S+/gi, '$1[REDACTED]')
+        .replace(/([?&](?:token|code|secret)=)[^&\s]+/gi, '$1[REDACTED]')
+        .slice(0, 500);
 }
 
 async function readJsonBody(req: IncomingMessage): Promise<unknown> {
@@ -126,7 +135,10 @@ export async function runHttpServer(): Promise<void> {
                 const method = (body as any)?.method;
                 const toolName = (body as any)?.params?.name;
                 process.stderr.write(`[Desktop Commander HTTP] Request: method=${method}${toolName ? ` tool=${toolName}` : ''}\n`);
-                await router.handlePost(req, res, body);
+                await runWithHttpRequestContext(
+                    { accessToken: req.auth?.token },
+                    () => router.handlePost(req, res, body),
+                );
                 return;
             }
             if (req.method === 'GET' || req.method === 'DELETE') {
@@ -136,7 +148,8 @@ export async function runHttpServer(): Promise<void> {
             writeJson(res, 405, { jsonrpc: '2.0', error: { code: -32000, message: 'Method not allowed' }, id: null });
         } catch (error) {
             const status = typeof (error as { statusCode?: unknown }).statusCode === 'number' ? (error as { statusCode: number }).statusCode : 500;
-            if (!res.headersSent) writeJson(res, status, { jsonrpc: '2.0', error: { code: status === 500 ? -32603 : -32000, message: status === 500 ? 'Internal server error' : String((error as Error).message) }, id: null });
+            const cause = safePublicErrorCause(error);
+            if (!res.headersSent) writeJson(res, status, { jsonrpc: '2.0', error: { code: status === 500 ? -32603 : -32000, message: status === 500 ? 'Internal server error' : cause, ...(status === 500 ? { data: { cause } } : {}) }, id: null });
             logger.error(`HTTP MCP request failed: ${error instanceof Error ? error.message : String(error)}`);
         }
     });

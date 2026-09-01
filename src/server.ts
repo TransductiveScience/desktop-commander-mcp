@@ -359,6 +359,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         - allowedDirectories (array of paths)
                         - fileReadLineLimit (number, max lines for read_file)
                         - fileWriteLineLimit (number, max lines per write_file call)
+                        - maxProcessWaitMs (number, response wait only; never child lifetime)
                         - telemetryEnabled (boolean)
                         
                         IMPORTANT: Setting allowedDirectories to an empty array ([]) allows full access 
@@ -1461,11 +1462,29 @@ async function handleCallToolRequest(request: CallToolRequest): Promise<ServerRe
 
             // Terminal tools
             case "start_process":
-                result = await handlers.handleStartProcess(args);
+                try {
+                    result = await handlers.handleStartProcess(args);
+                } catch (error) {
+                    const cause = error instanceof Error ? error.message : String(error);
+                    logger.error(`Error in start_process handler: ${error instanceof Error ? error.stack || error.message : String(error)}`);
+                    result = {
+                        content: [{ type: "text", text: `Error: start_process failed: ${cause}` }],
+                        isError: true,
+                    };
+                }
                 break;
 
             case "read_process_output":
-                result = await handlers.handleReadProcessOutput(args);
+                try {
+                    result = await handlers.handleReadProcessOutput(args);
+                } catch (error) {
+                    const cause = error instanceof Error ? error.message : String(error);
+                    logger.error(`Error in read_process_output handler: ${error instanceof Error ? error.stack || error.message : String(error)}`);
+                    result = {
+                        content: [{ type: "text", text: `Error: read_process_output failed: ${cause}` }],
+                        isError: true,
+                    };
+                }
                 break;
 
             case "interact_with_process":

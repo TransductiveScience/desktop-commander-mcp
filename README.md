@@ -13,6 +13,9 @@ This build strengthens the HTTP connector and Windows deployment path without ch
 * **Mechanically verifiable deployments** — every build writes `dist/build-info.json`; `/healthz` reports the Git revision, dirty state, build time, Node version, and SHA-256 hashes for the HTTP router and server artifacts.
 * **More resilient background operation** — the Edge installer selects the system Node.js runtime when available and allows extended scheduled-task restart recovery instead of remaining offline after a short-lived port conflict.
 * **Executable regression coverage** — focused router lifecycle tests and the HTTP acceptance matrix cover stateful initialization, sessionless dispatch, stale-session handling, repeated independent requests, configuration access, session listing, and host command execution.
+* **Reconnect-safe process handoff** — long-running commands return a stable PID after their first output (or a connector-safe response ceiling), while tool-call timeouts release the response without terminating or detaching the child.
+* **Stable Windows execution identity** — the Edge task runs as the installing interactive user instead of `SYSTEM`, preserving USERPROFILE, APPDATA, PATH, and user-scoped CLI authentication across reconnects and task restarts.
+* **Non-destructive live upgrades** — an optional loopback-only process fallback lets a replacement HTTP runtime keep reading or controlling sessions owned by a draining local runtime, so deployment no longer requires abandoning an already-running job.
 
 OAuth 2.0/OIDC, PKCE S256, RS256/JWKS validation, protected-resource metadata, and the existing Cloudflare authorization flow remain intact.
 

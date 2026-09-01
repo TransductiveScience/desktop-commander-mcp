@@ -55,6 +55,7 @@ async function restoreCap() { await configManager.setValue(CAP_KEY, ORIGINAL_CAP
 // A silent, long-running, non-exiting process: matches none of the early-exit
 // paths (no prompt, no output, no exit) so only the wait cap can end the call.
 const SILENT_CHILD = `node -e "setTimeout(function(){}, ${CHILD_LIFETIME_MS})"`;
+const TEST_SHELL = process.platform === 'win32' ? 'cmd.exe' : undefined;
 
 /**
  * Test 1 (FAILS now): start_process must cap its initial wait.
@@ -65,7 +66,7 @@ async function testStartProcessCapsWait() {
   console.log('\n📋 Test 1: start_process caps initial wait below timeout_ms...');
   await setCap(TEST_CAP_MS);
   const t0 = Date.now();
-  const res = await terminalManager.executeCommand(SILENT_CHILD, LARGE_TIMEOUT_MS, undefined, true);
+  const res = await terminalManager.executeCommand(SILENT_CHILD, LARGE_TIMEOUT_MS, TEST_SHELL, true);
   const elapsed = since(t0);
   cleanup(res.pid);
 
@@ -93,7 +94,7 @@ const BUSY_INPUT = `var __end=Date.now()+${BUSY_MS}; while(Date.now()<__end){}`;
 async function testInteractCapsWait() {
   console.log('\n📋 Test 2: interact_with_process caps its wait below timeout_ms...');
   // Start a REPL (returns fast via prompt detection, well under any cap).
-  const start = await terminalManager.executeCommand('node -i', 3000, undefined, false);
+  const start = await terminalManager.executeCommand('node -i', 3000, TEST_SHELL, false);
   const pid = start.pid;
   assert(pid > 0, 'should have started a REPL session');
 
@@ -126,14 +127,15 @@ async function testPromptStillReturnsEarly() {
   const res = await terminalManager.executeCommand(
     `node -e "process.stdout.write('>>> ');setTimeout(function(){}, ${CHILD_LIFETIME_MS})"`,
     bigTimeout,
-    undefined,
+    TEST_SHELL,
     true
   );
   const elapsed = since(t0);
   cleanup(res.pid);
 
   assert.strictEqual(res.isBlocked, true, 'prompt means waiting for input');
-  assert(elapsed < 1000, `should return quickly via prompt, took ${elapsed}ms`);
+  assert(res.timingInfo.totalDurationMs < 1000,
+    `prompt detection should return quickly, took ${res.timingInfo.totalDurationMs}ms`);
   assert(
     res.timingInfo.exitReason.startsWith('early_exit'),
     `expected an early_exit reason, got "${res.timingInfo.exitReason}"`
@@ -154,7 +156,7 @@ async function testRealTimeClientCeiling() {
   const HUGE_TIMEOUT_MS = 300000;
 
   const t0 = Date.now();
-  const pending = terminalManager.executeCommand(SILENT_CHILD, HUGE_TIMEOUT_MS, undefined, false);
+  const pending = terminalManager.executeCommand(SILENT_CHILD, HUGE_TIMEOUT_MS, TEST_SHELL, false);
   await sleep(800);
   const sessions = terminalManager.listActiveSessions();
   const pid = sessions.length ? sessions[sessions.length - 1].pid : -1;

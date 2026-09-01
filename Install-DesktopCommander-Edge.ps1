@@ -53,12 +53,18 @@ if ($cloudflared) {
     Write-Host "  Note: Cloudflare Tunnel (cloudflared) can be installed via 'winget install Cloudflare.cloudflared'." -ForegroundColor Gray
 }
 
-# 5. Register Auto-Starting Windows Service
-Write-Host "`n[5/6] Registering persistent Windows background task..." -ForegroundColor Yellow
+# 5. Register under the current interactive identity. Desktop Commander runs
+# user-scoped developer tools and must inherit that user's profile/credentials;
+# SYSTEM changes USERPROFILE/APPDATA and silently loses gh and similar auth.
+Write-Host "`n[5/6] Registering persistent interactive-user background task..." -ForegroundColor Yellow
 $taskName = "DesktopCommanderMCP"
+$taskUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+if ($taskUser -eq 'NT AUTHORITY\SYSTEM') {
+    throw 'Run this installer from the intended interactive Windows account, not SYSTEM.'
+}
 $action = New-ScheduledTaskAction -Execute $nodeExe -Argument "`"$scriptDir\scripts\start-http-server.js`"" -WorkingDirectory $scriptDir
-$trigger = New-ScheduledTaskTrigger -AtStartup
-$principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+$trigger = New-ScheduledTaskTrigger -AtLogOn -User $taskUser
+$principal = New-ScheduledTaskPrincipal -UserId $taskUser -LogonType Interactive -RunLevel Highest
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1)
 
 try {
@@ -66,7 +72,7 @@ try {
     Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
     Start-Sleep -Seconds 1
     Start-ScheduledTask -TaskName $taskName
-    Write-Host "  Windows service registered & started successfully!" -ForegroundColor Green
+    Write-Host "  Windows task registered & started as $taskUser successfully!" -ForegroundColor Green
 } catch {
     Write-Host "  Warning: Run as Administrator to register startup task: $_" -ForegroundColor Yellow
 }

@@ -29,6 +29,11 @@ function appendRuntimeLog(level, value) {
     } catch {}
 }
 
+function argumentValue(name) {
+    const index = process.argv.indexOf(name);
+    return index >= 0 ? process.argv[index + 1] : undefined;
+}
+
 process.on('uncaughtException', (error) => {
     appendRuntimeLog('Uncaught exception', error);
     process.exit(1);
@@ -40,20 +45,28 @@ process.on('unhandledRejection', (reason) => {
 });
 
 async function main() {
-    process.env.USERPROFILE = process.env.USERPROFILE || 'C:\\Users\\Admin';
-    process.env.HOME = process.env.HOME || 'C:\\Users\\Admin';
-    process.env.DESKTOP_COMMANDER_HTTP_HOST = process.env.DESKTOP_COMMANDER_HTTP_HOST || '127.0.0.1';
-    process.env.DESKTOP_COMMANDER_HTTP_PORT = process.env.DESKTOP_COMMANDER_HTTP_PORT || '9180';
+    // Keep all home/profile variables bound to the task's real Windows user.
+    // Mixing a hard-coded HOME with SYSTEM's USERPROFILE/APPDATA makes
+    // user-scoped CLIs read credentials from different accounts.
+    if (!process.env.HOME && process.env.USERPROFILE) {
+        process.env.HOME = process.env.USERPROFILE;
+    }
+    process.env.DESKTOP_COMMANDER_HTTP_HOST = argumentValue('--host') || process.env.DESKTOP_COMMANDER_HTTP_HOST || '127.0.0.1';
+    process.env.DESKTOP_COMMANDER_HTTP_PORT = argumentValue('--port') || process.env.DESKTOP_COMMANDER_HTTP_PORT || '9180';
+    process.env.DESKTOP_COMMANDER_PROCESS_FALLBACK_PORT = argumentValue('--process-fallback-port')
+        || process.env.DESKTOP_COMMANDER_PROCESS_FALLBACK_PORT;
     process.env.DESKTOP_COMMANDER_HTTP_AUTH = process.env.DESKTOP_COMMANDER_HTTP_AUTH || 'oauth';
     process.env.DESKTOP_COMMANDER_OAUTH_ISSUER = process.env.DESKTOP_COMMANDER_OAUTH_ISSUER || 'https://desktopcommander-auth.seyferthfriso.workers.dev';
-    process.env.DESKTOP_COMMANDER_OAUTH_VERIFIER_MODULE = process.env.DESKTOP_COMMANDER_OAUTH_VERIFIER_MODULE || './scripts/jwt-verifier.js';
+    process.env.DESKTOP_COMMANDER_OAUTH_VERIFIER_MODULE = process.env.DESKTOP_COMMANDER_OAUTH_VERIFIER_MODULE
+        || path.join(worktree, 'scripts', 'jwt-verifier.js');
     process.env.DESKTOP_COMMANDER_PUBLIC_BASE_URL = process.env.DESKTOP_COMMANDER_PUBLIC_BASE_URL || 'https://desktopcommander.transductive.art';
     process.env.DESKTOP_COMMANDER_DISABLE_TELEMETRY = '1';
 
     // Runtime modules must observe the service environment during evaluation.
     const { runHttpServer } = await import('../dist/http/index.js');
     await runHttpServer();
-    appendRuntimeLog('Started', `pid=${process.pid} worktree=${worktree}`);
+    const identity = [process.env.USERDOMAIN, process.env.USERNAME].filter(Boolean).join('\\');
+    appendRuntimeLog('Started', `pid=${process.pid} identity=${identity || 'unknown'} worktree=${worktree}`);
     setInterval(() => {}, 60000);
 }
 

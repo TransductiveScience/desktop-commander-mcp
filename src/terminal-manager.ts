@@ -56,6 +56,18 @@ interface CompletedSession {
 export const MAX_BUFFERED_OUTPUT_CHARS = 50 * 1024 * 1024;  // per session; oldest lines evicted first
 const MAX_LINE_CHARS = 1024 * 1024;                  // force-split longer lines so eviction can work
 const MAX_WAIT_OUTPUT_CHARS = 2 * 1024 * 1024;       // start_process wait buffer (prompt/state detection)
+export const DEFAULT_MAX_PROCESS_WAIT_MS = 10000;
+const OUTPUT_HANDOFF_GRACE_MS = 150;
+
+export function effectiveProcessWaitMs(requestedMs: number, configuredMs?: unknown): number {
+  const requested = Number.isFinite(requestedMs) && requestedMs >= 0
+    ? requestedMs
+    : DEFAULT_COMMAND_TIMEOUT;
+  const configured = typeof configuredMs === 'number' && Number.isFinite(configuredMs) && configuredMs > 0
+    ? Math.min(configuredMs, DEFAULT_MAX_PROCESS_WAIT_MS)
+    : DEFAULT_MAX_PROCESS_WAIT_MS;
+  return Math.min(requested, configured);
+}
 
 // Result type for paginated output reading
 export interface PaginatedOutputResult {
@@ -175,17 +187,19 @@ export class TerminalManager {
   }
   
   async executeCommand(command: string, timeoutMs: number = DEFAULT_COMMAND_TIMEOUT, shell?: string, collectTiming: boolean = false): Promise<CommandExecutionResult> {
+    let config: Awaited<ReturnType<typeof configManager.getConfig>> | undefined;
+    try {
+      config = await configManager.getConfig();
+    } catch {
+      // Safe shell and wait-limit fallbacks are applied below.
+    }
+
     // Get the shell from config if not specified
     let shellToUse: string | boolean | undefined = shell;
     if (!shellToUse) {
-      try {
-        const config = await configManager.getConfig();
-        shellToUse = config.defaultShell || true;
-      } catch (error) {
-        // If there's an error getting the config, fall back to default
-        shellToUse = true;
-      }
+      shellToUse = config?.defaultShell || true;
     }
+    const responseWaitMs = effectiveProcessWaitMs(timeoutMs, config?.maxProcessWaitMs);
 
     // For REPL interactions, we need to ensure stdin, stdout, and stderr are properly configured
     // Note: No special stdio options needed here, Node.js handles pipes by default
@@ -290,6 +304,8 @@ export class TerminalManager {
     return new Promise((resolve) => {
       let resolved = false;
       let periodicCheck: NodeJS.Timeout | null = null;
+      let responseTimeout: NodeJS.Timeout | null = null;
+      let outputHandoff: NodeJS.Timeout | null = null;
 
       // Quick prompt patterns for immediate detection
       const quickPromptPatterns = />>>\s*$|>\s*$|\$\s*$|#\s*$/;
@@ -298,6 +314,8 @@ export class TerminalManager {
         if (resolved) return;
         resolved = true;
         if (periodicCheck) clearInterval(periodicCheck);
+        if (responseTimeout) clearTimeout(responseTimeout);
+        if (outputHandoff) clearTimeout(outputHandoff);
 
         // Add timing info if requested
         if (collectTiming) {
@@ -317,6 +335,22 @@ export class TerminalManager {
         resolve(result);
       };
 
+      // start_process owns the child as soon as it is spawned. Once ordinary
+      // output proves it is alive, hand the stable PID back after a short
+      // settle window while keeping all process listeners/session state active.
+      const scheduleOutputHandoff = () => {
+        if (resolved || outputHandoff) return;
+        outputHandoff = setTimeout(() => {
+          session.isBlocked = true;
+          exitReason = 'output_handoff';
+          resolveOnce({
+            pid: childProcess.pid!,
+            output,
+            isBlocked: true
+          });
+        }, OUTPUT_HANDOFF_GRACE_MS);
+      };
+
       childProcess.stdout.on('data', (data: any) => {
         const text = data.toString();
         const now = Date.now();
@@ -334,6 +368,7 @@ export class TerminalManager {
         }
         // Append to line-based buffer
         this.appendToLineBuffer(session, text);
+        scheduleOutputHandoff();
 
         // Record output event if collecting timing
         if (collectTiming) {
@@ -378,6 +413,7 @@ export class TerminalManager {
         }
         // Append to line-based buffer
         this.appendToLineBuffer(session, text);
+        scheduleOutputHandoff();
 
         // Record output event if collecting timing
         if (collectTiming) {
@@ -408,7 +444,7 @@ export class TerminalManager {
       }, 100);
 
       // Timeout fallback
-      setTimeout(() => {
+      responseTimeout = setTimeout(() => {
         session.isBlocked = true;
         exitReason = 'timeout';
         resolveOnce({
@@ -416,7 +452,7 @@ export class TerminalManager {
           output,
           isBlocked: true
         });
-      }, timeoutMs);
+      }, responseWaitMs);
 
       const handleExit = (code: any) => {
         if (childProcess.pid) {

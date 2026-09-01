@@ -13,6 +13,7 @@ export interface ServerConfig {
   telemetryEnabled?: boolean; // New field for telemetry control
   fileWriteLineLimit?: number; // Line limit for file write operations
   fileReadLineLimit?: number; // Default line limit for file read operations (changed from character-based)
+  maxProcessWaitMs?: number; // Maximum time a process tool call waits before handing control back
   clientId?: string; // Unique client identifier for analytics
   currentClient?: ClientInfo; // Current connected client information
   [key: string]: any; // Allow for arbitrary configuration keys (including abTest_* keys)
@@ -91,6 +92,10 @@ class ConfigManager {
         if (this.config['welcomeOnboardingEligible'] === undefined) {
           this.config['welcomeOnboardingEligible'] = false;
           this.config['pendingWelcomeOnboarding'] = false;
+          await this.saveConfig();
+        }
+        if (this.config.maxProcessWaitMs === undefined) {
+          this.config.maxProcessWaitMs = 10000;
           await this.saveConfig();
         }
       } catch (error) {
@@ -183,6 +188,7 @@ class ConfigManager {
       telemetryEnabled: true, // Default to opt-out approach (telemetry on by default)
       fileWriteLineLimit: 50,  // Default line limit for file write operations (changed from 100)
       fileReadLineLimit: 1000,  // Default line limit for file read operations (changed from character-based)
+      maxProcessWaitMs: 10000, // Releasing a tool call never terminates its child process
       pendingWelcomeOnboarding: true, // New install flag - triggers A/B test for welcome page
       welcomeOnboardingEligible: true // Distinguishes new installs from migrated legacy configs
     };

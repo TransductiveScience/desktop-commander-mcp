@@ -1,4 +1,4 @@
-import { terminalManager, MAX_BUFFERED_OUTPUT_CHARS } from '../terminal-manager.js';
+import { terminalManager, MAX_BUFFERED_OUTPUT_CHARS, effectiveProcessWaitMs } from '../terminal-manager.js';
 import { commandManager } from '../command-manager.js';
 import { StartProcessArgsSchema, ReadProcessOutputArgsSchema, InteractWithProcessArgsSchema, ForceTerminateArgsSchema, ListSessionsArgsSchema } from './schemas.js';
 import { capture } from "../utils/capture.js";
@@ -10,6 +10,7 @@ import { spawn } from 'child_process';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { callProcessFallback, hasProcessFallback } from './process-fallback.js';
 
 // Get the directory where the MCP is installed (for ES module imports)
 const __filename = fileURLToPath(import.meta.url);
@@ -259,6 +260,7 @@ export async function readProcessOutput(args: unknown): Promise<ServerResult> {
     length = defaultLength,        // Default from config, same as file reading
     verbose_timing = false 
   } = parsed.data;
+  const responseWaitMs = effectiveProcessWaitMs(timeout_ms, config.maxProcessWaitMs);
 
   // Timing telemetry
   const startTime = Date.now();
@@ -267,12 +269,12 @@ export async function readProcessOutput(args: unknown): Promise<ServerResult> {
   const session = terminalManager.getSession(pid);
   if (session && offset === 0) {
     // Wait for new output to arrive (only for "new output" reads, not absolute/tail)
-    const waitForOutput = (): Promise<void> => {
+    const waitForOutput = (): Promise<boolean> => {
       return new Promise((resolve) => {
         // Check if there's already new output
         const currentLines = terminalManager.getOutputLineCount(pid) || 0;
         if (currentLines > session.lastReadIndex) {
-          resolve();
+          resolve(true);
           return;
         }
 
@@ -285,25 +287,25 @@ export async function readProcessOutput(args: unknown): Promise<ServerResult> {
           if (timeout) clearTimeout(timeout);
         };
 
-        const resolveOnce = () => {
+        const resolveOnce = (receivedOutput: boolean) => {
           if (resolved) return;
           resolved = true;
           cleanup();
-          resolve();
+          resolve(receivedOutput);
         };
 
         // Poll for new output
         interval = setInterval(() => {
           const newLineCount = terminalManager.getOutputLineCount(pid) || 0;
           if (newLineCount > session.lastReadIndex) {
-            resolveOnce();
+            resolveOnce(true);
           }
         }, 50);
 
         // Timeout
         timeout = setTimeout(() => {
-          resolveOnce();
-        }, timeout_ms);
+          resolveOnce(false);
+        }, responseWaitMs);
       });
     };
 
@@ -314,6 +316,8 @@ export async function readProcessOutput(args: unknown): Promise<ServerResult> {
   const result = terminalManager.readOutputPaginated(pid, offset, length);
   
   if (!result) {
+    const fallback = await callProcessFallback('read_process_output', parsed.data);
+    if (fallback) return fallback;
     return {
       content: [{ type: "text", text: `No session found for PID ${pid}` }],
       isError: true,
@@ -361,6 +365,8 @@ export async function readProcessOutput(args: unknown): Promise<ServerResult> {
     const processState = analyzeProcessState(fullOutput, pid);
     if (processState.isWaitingForInput) {
       processStateMessage = `\n🔄 ${formatProcessStateMessage(processState, pid)}`;
+    } else if (result.readCount === 0) {
+      processStateMessage = `\n⏱️ No new output within ${responseWaitMs}ms; process ${pid} remains attached and running.`;
     }
   }
 
@@ -408,6 +414,7 @@ export async function interactWithProcess(args: unknown): Promise<ServerResult> 
   // Get config for output line limit
   const config = await configManager.getConfig();
   const maxOutputLines = config.fileReadLineLimit ?? 1000;
+  const responseWaitMs = effectiveProcessWaitMs(timeout_ms, config.maxProcessWaitMs);
 
   // Check if this is a virtual Node session (node:local)
   if (virtualNodeSessions.has(pid)) {
@@ -421,6 +428,11 @@ export async function interactWithProcess(args: unknown): Promise<ServerResult> 
     // Respect per-call timeout if provided, otherwise use session default
     const effectiveTimeout = timeout_ms ?? session.timeout_ms;
     return executeNodeCode(input, effectiveTimeout);
+  }
+
+  if (!terminalManager.getSession(pid) && hasProcessFallback()) {
+    const fallback = await callProcessFallback('interact_with_process', parsed.data);
+    if (fallback) return fallback;
   }
 
   // Timing telemetry
@@ -488,7 +500,7 @@ export async function interactWithProcess(args: unknown): Promise<ServerResult> 
         let resolved = false;
         let attempts = 0;
         const pollIntervalMs = 50; // Poll every 50ms for faster response
-        const maxAttempts = Math.ceil(timeout_ms / pollIntervalMs);
+        const maxAttempts = Math.ceil(responseWaitMs / pollIntervalMs);
         let interval: NodeJS.Timeout | null = null;
         let lastOutputLength = 0; // Track output length to detect new output
 
@@ -681,6 +693,10 @@ export async function forceTerminate(args: unknown): Promise<ServerResult> {
   }
 
   const success = terminalManager.forceTerminate(pid);
+  if (!success && hasProcessFallback()) {
+    const fallback = await callProcessFallback('force_terminate', parsed.data);
+    if (fallback) return fallback;
+  }
   return {
     content: [{
       type: "text",
@@ -713,6 +729,18 @@ export async function listSessions(): Promise<ServerResult> {
   );
 
   const allSessions = [...realSessionsText, ...virtualSessionsText];
+  if (hasProcessFallback()) {
+    const fallback = await callProcessFallback('list_sessions', {});
+    const fallbackText = fallback?.content
+      ?.filter((item) => item.type === 'text')
+      .map((item) => item.text)
+      .join('\n');
+    if (fallbackText && fallbackText !== 'No active sessions') {
+      for (const line of fallbackText.split(/\r?\n/).filter(Boolean)) {
+        if (!allSessions.includes(line)) allSessions.push(line);
+      }
+    }
+  }
 
   return {
     content: [{

@@ -38,6 +38,11 @@ export const CONFIG_FIELD_DEFINITIONS = {
     description: 'Maximum number of lines that can be written in one edit operation. This helps prevent accidental oversized writes and keeps file changes predictable.',
     valueType: 'number',
   },
+  maxProcessWaitMs: {
+    label: 'Process Call Wait Limit',
+    description: 'Maximum milliseconds (up to the 10000ms connector-safe ceiling) a single start, interact, or output-read call may wait before returning control. Reaching this limit never terminates the child process; use the same PID to continue.',
+    valueType: 'number',
+  },
 } as const satisfies Record<string, ConfigFieldDefinition>;
 
 export type ConfigFieldKey = keyof typeof CONFIG_FIELD_DEFINITIONS;

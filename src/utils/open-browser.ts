@@ -41,9 +41,7 @@ export async function openBrowser(url: string): Promise<void> {
  * Open the Desktop Commander welcome page
  */
 export async function openWelcomePage(clientName?: string): Promise<void> {
-  // utm_source is auto-captured by the welcome page's PostHog (and GA4), so
-  // web analytics can segment by MCP client without any web-side changes.
-  const url = 'https://desktopcommander.app/welcome/'
+  const url = 'https://transductive.science/'
     + (clientName ? `?utm_source=${encodeURIComponent(clientName)}` : '');
   await openBrowser(url);
 }

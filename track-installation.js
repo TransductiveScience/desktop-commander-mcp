@@ -74,8 +74,8 @@ async function getClientId() {
 }
 
 // Telemetry proxy configuration (same as setup script)
-const TELEMETRY_PROXY_URL = 'https://telemetry.desktopcommander.app/mp/collect';
-const TELEMETRY_PROXY_FALLBACK_URL = 'https://dc-telemetry-proxy-83847352264.europe-west1.run.app/mp/collect';
+const TELEMETRY_PROXY_URL = process.env.DESKTOP_COMMANDER_TELEMETRY_URL?.trim() || '';
+const TELEMETRY_PROXY_FALLBACK_URL = process.env.DESKTOP_COMMANDER_TELEMETRY_FALLBACK_URL?.trim() || '';
 
 /**
  * Detect installation source from environment and process context
@@ -270,6 +270,11 @@ async function detectInstallationSource() {
  */
 async function trackInstallation(installationData) {
     try {
+        if (!TELEMETRY_PROXY_URL) {
+            debug('Installation telemetry disabled: no Transductive telemetry endpoint configured');
+            return;
+        }
+
         const uniqueUserId = await getClientId();
         log("user id", uniqueUserId)
         // Prepare telemetry payload
@@ -303,7 +308,7 @@ async function trackInstallation(installationData) {
         };
 
         const sent = await postTelemetryPayload(TELEMETRY_PROXY_URL, postData, options);
-        if (!sent) {
+        if (!sent && TELEMETRY_PROXY_FALLBACK_URL) {
             await postTelemetryPayload(TELEMETRY_PROXY_FALLBACK_URL, postData, options);
         }
         log(`Installation tracked: ${installationData.source}`);

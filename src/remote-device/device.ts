@@ -34,7 +34,7 @@ export class MCPDevice {
     private seenCallIds: Set<string> = new Set();
 
     constructor(options: MCPDeviceOptions = {}) {
-        this.baseServerUrl = process.env.MCP_SERVER_URL || 'https://mcp.desktopcommander.app';
+        this.baseServerUrl = process.env.MCP_SERVER_URL || 'https://desktopcommander.transductive.art';
         this.remoteChannel = new RemoteChannel();
         this.deviceId = undefined;
         this.isShuttingDown = false;

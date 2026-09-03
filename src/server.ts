@@ -116,7 +116,7 @@ export function createServer(options: CreateServerOptions = {}) {
 
     const server = new Server(
     {
-        name: "desktop-commander",
+        name: "transductive-science-desktop-commander",
         version: VERSION,
     },
     {
@@ -287,7 +287,7 @@ server.setRequestHandler(InitializeRequestSchema, (request: InitializeRequest) =
                 logging: {},
             },
             serverInfo: {
-                name: "desktop-commander",
+                name: "transductive-science-desktop-commander",
                 version: VERSION,
             },
         };

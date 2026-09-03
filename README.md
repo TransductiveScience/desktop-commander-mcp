@@ -1,12 +1,13 @@
 # Desktop Commander MCP (Transductive Edge Edition)
 ### Search, update, manage files, run terminal commands with AI — Now with Native Streamable HTTP & ChatGPT OAuth Support
 
-> **Powered by [Transductive Science](https://transductive.org)** — Bridging foundational agentic frameworks, multi-tenant MCP edge runtimes, and autonomous tooling across desktop and cloud ecosystems.
+> **Powered by [Transductive Science](https://transductive.science)** — Bridging foundational agentic frameworks, multi-tenant MCP edge runtimes, and autonomous tooling across desktop and cloud ecosystems.
 
 ## Reliability improvements in this build
 
 This build strengthens the HTTP connector and Windows deployment path without changing the existing OAuth security model:
 
+* **Transductive-only runtime routing** — the MCP identifies itself as `transductive-science-desktop-commander`; inherited upstream feature-flag, telemetry, onboarding, Docker-help, remote-device, and plugin-catalog destinations were removed. Remote flags and telemetry are explicit opt-ins only.
 * **Reliable direct ChatGPT tool calls** — `src/http/mcp-router.ts` now uses a genuinely stateless MCP transport when a request has no session header, so direct calls such as `get_config`, `list_sessions`, and `start_process` no longer fail with “Server not initialized.”
 * **Durable session routing** — initialize-shaped requests receive a dedicated stateful transport, newly issued session IDs remain bound to that transport, repeated calls reuse the correct server, and genuinely stale IDs return a clean `404`.
 * **Deterministic Windows startup** — `scripts/start-http-server.js` applies HTTP, OAuth, and telemetry settings before loading the runtime, records checkout-local stdout/stderr and fatal diagnostics, and exits cleanly for scheduled-task recovery.
@@ -19,7 +20,7 @@ This build strengthens the HTTP connector and Windows deployment path without ch
 
 OAuth 2.0/OIDC, PKCE S256, RS256/JWKS validation, protected-resource metadata, and the existing Cloudflare authorization flow remain intact.
 
-[![Transductive Science](https://img.shields.io/badge/Transductive-Science-7c3aed?style=for-the-badge&logo=cloudflare&logoColor=white)](https://transductive.org)
+[![Transductive Science](https://img.shields.io/badge/Transductive-Science-7c3aed?style=for-the-badge&logo=cloudflare&logoColor=white)](https://transductive.science)
 [![ChatGPT Ready](https://img.shields.io/badge/ChatGPT-Custom%20App%20%26%20MCP%20Ready-10a37f?style=for-the-badge&logo=openai&logoColor=white)](https://chatgpt.com)
 [![Streamable HTTP](https://img.shields.io/badge/MCP-Streamable%20HTTP%20%2B%20OAuth%202.0-0284c7?style=for-the-badge)](https://modelcontextprotocol.io)
 
@@ -67,18 +68,9 @@ When deploying remote MCP servers for AI agents over the web, here are real-worl
 
 
 
-## 🖥️ Try the Desktop Commander App (Beta)
+## 🖥️ Transductive Science deployment
 
-**Want a better experience?** The Desktop Commander App gives you everything the MCP server does, plus:
-
-- **Use any AI model** — Claude, GPT-4.5, Gemini 2.5, or any model you prefer
-- **See file changes live** — visual file previews as AI edits your files
-- **Add custom MCPs and context** — extend with your own tools, no config files
-- **Coming soon** — skills system, dictation, background scheduled tasks, and more
-
-**👉 [Download the App](https://desktopcommander.app/#download)** (macOS & Windows)
-
-> The MCP server below still works great with Claude Desktop and other MCP clients — the app is for those who want a dedicated, polished experience.
+This edition is operated through the Transductive Science MCP endpoint and does not redirect users to an upstream application site. See [Transductive Science](https://transductive.science) for the maintained deployment.
 
 ## Table of Contents
 - [Features](#features)
@@ -102,7 +94,7 @@ Execute long-running terminal commands on your computer and manage processes thr
 
 ## Features
 
-- **Remote AI Control** - Use Desktop Commander from ChatGPT, Claude web, and other AI services via [Remote MCP](https://mcp.desktopcommander.app)
+- **Remote AI Control** - Use Desktop Commander from ChatGPT and other web agents through the Transductive Science Streamable HTTP deployment.
 - **File Preview UI** - Visual file previews in Claude Desktop with rendered markdown, inline images, expandable content, built-in markdown editor, and quick "Open in folder" access
 - **Enhanced terminal commands with interactive process control**
 - **Execute code in memory (Python, Node.js, R) without saving files**
@@ -522,7 +514,7 @@ Or add to `.qwen/settings.json` (project) or `~/.qwen/settings.json` (global). S
 
 Use Desktop Commander from **ChatGPT**, **Claude web**, and other AI services via Remote MCP — no desktop app required.
 
-**👉 [Get started at mcp.desktopcommander.app](https://mcp.desktopcommander.app)**
+**👉 [Get started with Transductive Science](https://transductive.science)**
 
 How it works:
 1. You run a lightweight **Remote Device** on your computer
@@ -1090,7 +1082,7 @@ Generous supporters are featured here. Thank you for helping make this project p
 
 ## Website
 
-Visit our official website at [https://desktopcommander.app/](https://desktopcommander.app/) for the latest information, documentation, and updates.
+Visit [Transductive Science](https://transductive.science/) for deployment information and updates.
 
 ## Media
 
@@ -1169,7 +1161,7 @@ Yes, when installed through npx or Smithery, Desktop Commander automatically upd
 - Making surgical code changes with precise control
 
 ### I'm having trouble installing or using the tool. Where can I get help?
-Join our [Discord server](https://discord.gg/kQ27sNnZr7) for community support, check the [GitHub issues](https://github.com/wonderwhy-er/DesktopCommanderMCP/issues) for known problems, or review the [full FAQ](FAQ.md) for troubleshooting tips. You can also visit our [website FAQ section](https://desktopcommander.app#faq) for a more user-friendly experience. If you encounter a new issue, please consider [opening a GitHub issue](https://github.com/wonderwhy-er/DesktopCommanderMCP/issues/new) with details about your problem.
+Review the [full FAQ](FAQ.md) for troubleshooting tips or visit [Transductive Science](https://transductive.science). Upstream issue links remain available for attribution and historical problem reports.
 
 ### How do I report security vulnerabilities?
 Please create a [GitHub Issue](https://github.com/wonderwhy-er/DesktopCommanderMCP/issues) with detailed information about any security vulnerabilities you discover. See our [Security Policy](SECURITY.md) for complete guidelines on responsible disclosure.

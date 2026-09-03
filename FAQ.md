@@ -2,7 +2,7 @@
 
 This document provides answers to the most commonly asked questions about Claude Desktop Commander (also known as ClaudeComputerCommander). If you can't find an answer to your question here, please join our [Discord server](https://discord.gg/kQ27sNnZr7) for additional support or [open a GitHub issue](https://github.com/wonderwhy-er/ClaudeComputerCommander/issues/new).
 
-> **Note**: For a more user-friendly version of this FAQ, visit our [website FAQ section](https://desktopcommander.app#faq).
+> **Note**: This Transductive Science edition is maintained at [transductive.science](https://transductive.science).
 
 ## Table of Contents
 

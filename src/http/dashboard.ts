@@ -200,7 +200,7 @@ export function renderDashboardHtml(info: {
     </div>
 
     <footer>
-      <p>Desktop Commander Edge Edition is an open-source project by <a href="https://transductive.org" target="_blank">Transductive Science</a>.</p>
+      <p>Desktop Commander Edge Edition is an open-source project by <a href="https://transductive.science" target="_blank">Transductive Science</a>.</p>
       <p style="margin-top: 6px;">Repository: <a href="https://github.com/Tranductive-Science/desktop-commander-mcp" target="_blank">github.com/Tranductive-Science/desktop-commander-mcp</a></p>
     </footer>
   </div>

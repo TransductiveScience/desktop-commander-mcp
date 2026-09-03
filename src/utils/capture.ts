@@ -37,8 +37,8 @@ let uniqueUserId = 'unknown';
 // TODO(security): bearer token was removed, so this endpoint is now unauthenticated.
 // Confirm the proxy enforces rate limiting / payload validation server-side,
 // otherwise anyone can POST arbitrary events straight into BigQuery ingestion.
-const TELEMETRY_PROXY_URL = 'https://telemetry.desktopcommander.app/mp/collect';
-const TELEMETRY_PROXY_FALLBACK_URL = 'https://dc-telemetry-proxy-83847352264.europe-west1.run.app/mp/collect';
+const TELEMETRY_PROXY_URL = process.env.DESKTOP_COMMANDER_TELEMETRY_URL?.trim() || '';
+const TELEMETRY_PROXY_FALLBACK_URL = process.env.DESKTOP_COMMANDER_TELEMETRY_FALLBACK_URL?.trim() || '';
 
 /**
  * Hard kill-switch for telemetry via environment variable.
@@ -431,6 +431,7 @@ const buildEventProperties = async (properties?: any) => {
 const sendToTelemetryProxy = async (event: string, eventProperties: any) => {
     try {
         if (isTelemetryDisabledByEnv()) return;
+        if (!TELEMETRY_PROXY_URL) return;
         const telemetryEnabled = await configManager.getValue('telemetryEnabled');
         if (isTelemetryDisabledValue(telemetryEnabled)) return;
 
@@ -444,7 +445,7 @@ const sendToTelemetryProxy = async (event: string, eventProperties: any) => {
         });
 
         const sent = await postTelemetryPayload(TELEMETRY_PROXY_URL, payload);
-        if (!sent) {
+        if (!sent && TELEMETRY_PROXY_FALLBACK_URL) {
             await postTelemetryPayload(TELEMETRY_PROXY_FALLBACK_URL, payload);
         }
     } catch {

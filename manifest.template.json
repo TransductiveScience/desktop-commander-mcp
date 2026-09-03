@@ -1,24 +1,24 @@
 {
   "$schema": "../../dist/mcpb-manifest.schema.json",
   "manifest_version": "0.3",
-  "name": "desktop-commander",
-  "display_name": "Desktop Commander",
+  "name": "transductive-science-desktop-commander",
+  "display_name": "Transductive Science Desktop Commander",
   "version": "{{VERSION}}",
   "description": "Build, explore, and automate on your local machine with access to files and terminal.",
   "long_description": "Combine local filesystem access with full terminal control to handle technical tasks through natural language. Desktop Commander empowers you to build, explore, and automate - from organizing repositories to creating complete applications:\n* **Build from scratch** - Create features and applications with simple commands\n* **Manage development environments** - Set up servers, configure systems, and handle processes\n* **Manage context and documentation** - Keep track of project details and technical specifications\n* **Explore existing codebases and projects** - Navigate and understand complex repositories\n\nThis extension bridges technical skill gaps by providing full command-line superpowers through an interface that understands your intent and handles complexity automatically.",
   "author": {
-    "name": "Desktop Commander Team",
-    "email": "er@desktopcommander.app",
-    "url": "https://desktopcommander.app/"
+    "name": "Transductive Science",
+    "email": "contact@transductive.science",
+    "url": "https://transductive.science/"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/wonderwhy-er/DesktopCommanderMCP.git"
+    "url": "https://github.com/TransductiveScience/desktop-commander-mcp.git"
   },
-  "homepage": "https://github.com/wonderwhy-er/DesktopCommanderMCP",
-  "documentation": "https://github.com/wonderwhy-er/DesktopCommanderMCP/blob/main/FAQ.md",
-  "support": "https://github.com/wonderwhy-er/DesktopCommanderMCP/issues",
-  "privacy_policies": ["https://legal.desktopcommander.app/privacy_desktop_commander_mcp"],
+  "homepage": "https://transductive.science/",
+  "documentation": "https://github.com/TransductiveScience/desktop-commander-mcp/blob/main/FAQ.md",
+  "support": "https://github.com/TransductiveScience/desktop-commander-mcp/issues",
+  "privacy_policies": ["https://github.com/TransductiveScience/desktop-commander-mcp/blob/main/PRIVACY.md"],
   "icon": "icon.png",
   "server": {
     "type": "node",

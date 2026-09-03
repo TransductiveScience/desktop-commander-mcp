@@ -11,8 +11,8 @@ import * as https from 'https';
 import { randomUUID } from 'crypto';
 
 // Telemetry proxy configuration
-const TELEMETRY_PROXY_URL = 'https://telemetry.desktopcommander.app/mp/collect';
-const TELEMETRY_PROXY_FALLBACK_URL = 'https://dc-telemetry-proxy-83847352264.europe-west1.run.app/mp/collect';
+const TELEMETRY_PROXY_URL = process.env.DESKTOP_COMMANDER_TELEMETRY_URL?.trim() || '';
+const TELEMETRY_PROXY_FALLBACK_URL = process.env.DESKTOP_COMMANDER_TELEMETRY_FALLBACK_URL?.trim() || '';
 
 // Read clientId and telemetry settings from existing config
 let uniqueUserId = 'unknown';
@@ -270,7 +270,7 @@ async function trackEvent(eventName, additionalProps = {}) {
 }
 
 async function postTelemetryPayload(postData, options) {
-    for (const endpoint of [TELEMETRY_PROXY_URL, TELEMETRY_PROXY_FALLBACK_URL]) {
+    for (const endpoint of [TELEMETRY_PROXY_URL, TELEMETRY_PROXY_FALLBACK_URL].filter(Boolean)) {
         const result = await new Promise((resolve) => {
             let settled = false;
             let timeoutId;

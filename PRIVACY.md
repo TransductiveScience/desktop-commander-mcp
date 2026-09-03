@@ -154,8 +154,8 @@ We may update this privacy policy from time to time. When we do, we will publish
 
 ## Contact
 
-- **General questions**: Open an issue on our [GitHub repository](https://github.com/wonderwhy-er/DesktopCommanderMCP)
-- **Privacy concerns**: privacy@desktopcommander.app
+- **General questions**: Open an issue on the [Transductive Science repository](https://github.com/TransductiveScience/desktop-commander-mcp)
+- **Privacy concerns**: use the repository's private security-reporting channel
 
 We aim to respond to privacy inquiries within 30 days.
 

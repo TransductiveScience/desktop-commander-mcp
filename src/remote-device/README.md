@@ -132,7 +132,7 @@ On first run, the device uses the **OAuth 2.0 Device Authorization Flow** for se
 ### 3. Connect your AI
 
 Once the device is running and authenticated:
-1.  Navigate to **[https://mcp.desktopcommander.app](https://mcp.desktopcommander.app)**.
+1.  Navigate to **[https://desktopcommander.transductive.art](https://desktopcommander.transductive.art)**.
 2.  Use the interface to connect to the **Remote MCP** using available connectors.
 3.  Authorize the connection when prompted.
 4.  Your AI (ChatGPT/Claude) will now be able to see your connected device and execute commands!

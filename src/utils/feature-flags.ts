@@ -14,7 +14,7 @@ class FeatureFlagManager {
   private lastFetch: number = 0;
   private cachePath: string;
   private cacheMaxAge: number = 30 * 60 * 1000;
-  private flagUrl: string;
+  private flagUrl: string | null;
   private refreshInterval: NodeJS.Timeout | null = null;
   
   // Track fresh fetch status for A/B tests that need network flags
@@ -26,9 +26,8 @@ class FeatureFlagManager {
     const configDir = path.dirname(CONFIG_FILE);
     this.cachePath = path.join(configDir, 'feature-flags.json');
     
-    // Use production flags (v2 supports weighted variants)
-    this.flagUrl = process.env.DC_FLAG_URL || 
-      'https://desktopcommander.app/flags/v2/production.json';
+    // Remote flags are opt-in in the Transductive Science runtime.
+    this.flagUrl = process.env.DC_FLAG_URL?.trim() || null;
     
     // Set up promise for waiting on fresh fetch
     this.freshFetchPromise = new Promise((resolve) => {
@@ -41,6 +40,13 @@ class FeatureFlagManager {
    */
   async initialize(): Promise<void> {
     try {
+      if (!this.flagUrl) {
+        this.flags = {};
+        this.resolveFreshFetch?.();
+        logger.info('Feature flags initialized locally (remote refresh disabled)');
+        return;
+      }
+
       // Load from cache immediately (non-blocking)
       await this.loadFromCache();
       
@@ -93,6 +99,7 @@ class FeatureFlagManager {
    * Manually refresh flags immediately (for testing)
    */
   async refresh(): Promise<boolean> {
+    if (!this.flagUrl) return false;
     try {
       await this.fetchFlags();
       return true;
@@ -163,6 +170,7 @@ class FeatureFlagManager {
    * Fetch flags from remote URL
    */
   private async fetchFlags(): Promise<void> {
+    if (!this.flagUrl) return;
     const FETCH_TIMEOUT_MS = 3000;
     const controller = new AbortController();
     const abortTimeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);

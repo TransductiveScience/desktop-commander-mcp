@@ -154,6 +154,6 @@ export function protectedResourceMetadata(config: HttpAuthConfig, resourceUrl: s
         resource: resourceUrl,
         authorization_servers: [config.oauthIssuer],
         scopes_supported: config.requiredScopes,
-        resource_name: 'Desktop Commander',
+        resource_name: 'Transductive Science Desktop Commander',
     };
 }

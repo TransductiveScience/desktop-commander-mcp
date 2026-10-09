@@ -120,6 +120,14 @@
       "description": "List all running processes with PID, command name, CPU usage, and memory usage."
     },
     {
+      "name": "inspect_windows_process",
+      "description": "Inspect an exact Windows PID using sampled CPU, memory, thread/handle counts, priority, affinity, and process start identity."
+    },
+    {
+      "name": "set_windows_process_policy",
+      "description": "Dry-run or apply guarded Windows process priority and CPU affinity changes after verifying PID start identity."
+    },
+    {
       "name": "kill_process",
       "description": "Terminate a running process by PID. Use with caution."
     },

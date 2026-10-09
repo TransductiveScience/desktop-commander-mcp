@@ -3,6 +3,19 @@
 
 > **Powered by [Transductive Science](https://transductive.science)** — Bridging foundational agentic frameworks, multi-tenant MCP edge runtimes, and autonomous tooling across desktop and cloud ecosystems.
 
+## Platform support: cross-platform core, Windows-native process tools
+
+**Desktop Commander is not Windows-only.** File operations, terminal sessions, and the HTTP/MCP connector build on the upstream cross-platform Node.js core. This fork adds an independently verified **Windows-native process-control backend**; the platform-specific commands are available in the MCP catalog but explicitly reject non-Windows hosts.
+
+| Capability | Windows | Linux / macOS |
+| --- | --- | --- |
+| File, shell, HTTP/MCP, terminal/session tools | Core supported | Cross-platform core; this fork's current release has not been regression-tested here |
+| `list_processes` | Structured `Get-Process` output, avoiding broken `tasklist` parsing | `ps`-based listing |
+| `inspect_windows_process` | Live PID inspection: creation identity, sampled CPU, private/working-set memory, thread/handle counts, priority and affinity | Windows-only (explicit unsupported result) |
+| `set_windows_process_policy` | Guarded priority/affinity adjustment with exact PID creation timestamp, dry-run default and postcondition check | Windows-only (explicit unsupported result) |
+
+The native process work is **inspired by Process Lasso but is not a replacement for Process Lasso's full policy engine**. There is no kernel driver, automatic persistent priority policy, ProBalance engine, process suspend/resume, or system-wide scheduler in this release. Process priority changes require an explicit opt-in (`dry_run: false`), and real-time priority is deliberately excluded. For API examples and test evidence see [Windows Process Control](docs/WINDOWS-PROCESS-CONTROL.md).
+
 ## Reliability improvements in this build
 
 This build strengthens the HTTP connector and Windows deployment path without changing the existing OAuth security model:
@@ -34,7 +47,7 @@ This edition adds full **Production-Grade Streamable HTTP & OAuth 2.0 Edge Deplo
 
 * 🌐 **Native Streamable HTTP Transport**: Implements the official MCP Streamable HTTP 2024-11-05 specification (`/mcp`, `/healthz`, `/readyz`).
 * 🔐 **Built-in OAuth 2.0 / OIDC Authorization**: Full PKCE S256 verification, protected resource metadata (`/.well-known/oauth-protected-resource/mcp`), and RS256 JWT validation via JWKS.
-* 🤖 **Turnkey ChatGPT Integration**: Direct support for ChatGPT Custom Apps, Developer Connectors, and OpenAI Actions with instant tool scanning (all 26 desktop tools supported).
+* 🤖 **Turnkey ChatGPT Integration**: Direct support for ChatGPT Custom Apps, Developer Connectors, and OpenAI Actions with instant tool scanning (28 tools in this build (26 common tools plus 2 Windows-native process tools)).
 * 🛡️ **Cloudflare Edge & Tunnel Compatible**: Seamlessly routes through Cloudflare named tunnels or reverse proxies with multi-session isolation and request-local log streaming.
 * ⚙️ **Durable Background Runners**: Auto-healing Windows service runners and background daemons for 24/7 autonomous uptime.
 
@@ -46,7 +59,7 @@ This release specifically solves high-demand community requests that were previo
 
 | Upstream Issue | Problem Reported | How Transductive Edge Solves It |
 |---|---|---|
-| **[#664](https://github.com/wonderwhy-er/DesktopCommanderMCP/issues/664)** | *Improve OpenAI / ChatGPT compatibility* | Tested live with ChatGPT Custom Apps & Developer Connectors, supporting both stateful sessions and direct stateless tool dispatches across all 26 tools. |
+| **[#664](https://github.com/wonderwhy-er/DesktopCommanderMCP/issues/664)** | *Improve OpenAI / ChatGPT compatibility* | Tested live with ChatGPT Custom Apps & Developer Connectors, supporting both stateful sessions and direct stateless tool dispatches across the 28 registered tools. |
 | **[#617](https://github.com/wonderwhy-er/DesktopCommanderMCP/issues/617)** | *A way to remotely use DesktopCommander on local net via Streamable HTTP* | Implements standard `transport: "streamable-http"` on `/mcp`, allowing LAN, WAN, or Cloudflare Tunnel routing without requiring local `stdio`. |
 | **[#601](https://github.com/wonderwhy-er/DesktopCommanderMCP/issues/601)** & **#646** | *OAuth Session Creation Failure with ChatGPT PKCE* | Full OAuth 2.0 / OIDC Resource Server with automated Cloudflare Worker authorization server and JWKS verification. |
 

@@ -9,7 +9,7 @@ function configuredFallbackUrl(): URL | null {
     if (!raw && !port) return null;
     if (!raw) {
         if (!/^\d+$/.test(port!) || Number(port) < 1 || Number(port) > 65535) {
-            throw new Error('DESKTOP_COMMANDER_PROCESS_FALLBACK_PORT must be a valid TCP port');
+            return null;
         }
         return new URL(`http://127.0.0.1:${port}/mcp`);
     }

@@ -49,6 +49,19 @@ export const KillProcessArgsSchema = z.object({
   pid: z.number(),
 });
 
+// Windows-native process inspection and guarded resource policy.
+export const InspectWindowsProcessArgsSchema = z.object({
+  pid: z.number().int().positive(),
+  sample_ms: z.number().int().min(100).max(2000).default(300),
+});
+export const SetWindowsProcessPolicyArgsSchema = z.object({
+  pid: z.number().int().positive(),
+  expected_start_utc: z.string().regex(/^[0-9T:.Z+\-]+$/),
+  priority: z.enum(['idle','below_normal','normal','above_normal','high']).optional(),
+  affinity_mask: z.number().int().positive().max(2147483647).optional(),
+  dry_run: z.boolean().default(true),
+});
+
 // Filesystem tools schemas
 export const ReadFileArgsSchema = z.object({
   path: z.string(),
@@ -265,6 +278,8 @@ export const toolArgSchemas: Record<string, z.ZodTypeAny> = {
   force_terminate: ForceTerminateArgsSchema,
   list_sessions: ListSessionsArgsSchema,
   list_processes: ListProcessesArgsSchema,
+  inspect_windows_process: InspectWindowsProcessArgsSchema,
+  set_windows_process_policy: SetWindowsProcessPolicyArgsSchema,
   kill_process: KillProcessArgsSchema,
   get_usage_stats: GetUsageStatsArgsSchema,
   get_recent_tool_calls: GetRecentToolCallsArgsSchema,

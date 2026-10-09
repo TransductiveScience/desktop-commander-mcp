@@ -53,8 +53,12 @@ async function main() {
     }
     process.env.DESKTOP_COMMANDER_HTTP_HOST = argumentValue('--host') || process.env.DESKTOP_COMMANDER_HTTP_HOST || '127.0.0.1';
     process.env.DESKTOP_COMMANDER_HTTP_PORT = argumentValue('--port') || process.env.DESKTOP_COMMANDER_HTTP_PORT || '9180';
-    process.env.DESKTOP_COMMANDER_PROCESS_FALLBACK_PORT = argumentValue('--process-fallback-port')
-        || process.env.DESKTOP_COMMANDER_PROCESS_FALLBACK_PORT;
+    const fallbackPort = argumentValue('--process-fallback-port') || process.env.DESKTOP_COMMANDER_PROCESS_FALLBACK_PORT;
+    if (/^\d+$/.test(fallbackPort || '') && Number(fallbackPort) >= 1 && Number(fallbackPort) <= 65535) {
+        process.env.DESKTOP_COMMANDER_PROCESS_FALLBACK_PORT = fallbackPort;
+    } else {
+        delete process.env.DESKTOP_COMMANDER_PROCESS_FALLBACK_PORT;
+    }
     process.env.DESKTOP_COMMANDER_HTTP_AUTH = process.env.DESKTOP_COMMANDER_HTTP_AUTH || 'oauth';
     process.env.DESKTOP_COMMANDER_OAUTH_ISSUER = process.env.DESKTOP_COMMANDER_OAUTH_ISSUER || 'https://desktopcommander-auth.seyferthfriso.workers.dev';
     process.env.DESKTOP_COMMANDER_OAUTH_VERIFIER_MODULE = process.env.DESKTOP_COMMANDER_OAUTH_VERIFIER_MODULE

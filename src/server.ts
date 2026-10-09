@@ -41,6 +41,8 @@ import {
     GetConfigArgsSchema,
     SetConfigValueArgsSchema,
     ListProcessesArgsSchema,
+    InspectWindowsProcessArgsSchema,
+    SetWindowsProcessPolicyArgsSchema,
     EditBlockArgsSchema,
     GetUsageStatsArgsSchema,
     GiveFeedbackArgsSchema,
@@ -1113,9 +1115,9 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             {
                 name: "list_processes",
                 description: `
-                        List all running processes.
+                        List up to 100 processes ordered by memory use.
                         
-                        Returns process information including PID, command name, CPU usage, and memory usage.
+                        Returns PID, process name, cumulative CPU seconds, working/private memory, thread count, and handle count on Windows. Linux/macOS return ps-based process metrics.
                         
                         ${CMD_PREFIX_DESCRIPTION}`,
                 inputSchema: zodToJsonSchema(ListProcessesArgsSchema),
@@ -1123,6 +1125,18 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                     title: "List Running Processes",
                     readOnlyHint: true,
                 },
+            },
+            {
+                name: "inspect_windows_process",
+                description: "Inspect a Windows process by PID with sampled CPU, memory, handles, threads, start identity, parent process, affinity and priority. Does not modify the process.",
+                inputSchema: zodToJsonSchema(InspectWindowsProcessArgsSchema),
+                annotations: { title: "Inspect Windows Process", readOnlyHint: true, openWorldHint: false },
+            },
+            {
+                name: "set_windows_process_policy",
+                description: "Change a Windows process priority or CPU affinity after checking the exact PID creation time. Defaults to dry_run; excludes real-time priority.",
+                inputSchema: zodToJsonSchema(SetWindowsProcessPolicyArgsSchema),
+                annotations: { title: "Set Windows Process Policy", readOnlyHint: false, destructiveHint: true, openWorldHint: false },
             },
             {
                 name: "kill_process",
@@ -1511,6 +1525,14 @@ async function handleCallToolRequest(request: CallToolRequest): Promise<ServerRe
             // Process tools
             case "list_processes":
                 result = await handlers.handleListProcesses();
+                break;
+
+            case "inspect_windows_process":
+                result = await handlers.handleInspectWindowsProcess(args);
+                break;
+
+            case "set_windows_process_policy":
+                result = await handlers.handleSetWindowsProcessPolicy(args);
                 break;
 
             case "kill_process":

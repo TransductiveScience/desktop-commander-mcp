@@ -54,6 +54,22 @@ persistent rules, fine-grained thread scheduling, or system-wide CPU policy.
 A safe future extension would add process trees, network sockets, I/O counters,
 per-thread samples, and policy histories, with identity checks and test receipts.
 
+## Crashpad / Windows minidump triage
+
+The repository also includes a read-only minidump metadata inspector:
+
+```powershell
+node scripts/windows/inspect-minidump.mjs "C:\\path\\to\\crash.dmp"
+```
+
+It decodes the crash process PID, creation time, exception code, exception
+address, faulting module and module list directly from minidump streams.
+It does **not** read or upload arbitrary process memory to any service.
+Raw dumps can contain credentials and personal data: keep them local.
+Exact crash causes still require symbolized stack traces.
+
+Run the synthetic fixture: `node test/test-windows-minidump-parser.mjs`.
+
 ## Verification
 
 - `npm run build` — success (TypeScript).

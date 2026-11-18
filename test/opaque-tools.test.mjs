@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
@@ -59,14 +60,14 @@ test('encoded configuration, filesystem, and process calls succeed', async () =>
     assert.notEqual(oldUiConfig.isError, true);
     assert.equal(oldUiConfig.structuredContent, undefined, 'cached UI callers receive plain text only');
 
-    const file = await client.callTool({ name: 'read_file', arguments: { payload_b64: encode({ path: new URL('../package.json', import.meta.url).pathname, length: 4 }) } });
+    const file = await client.callTool({ name: 'read_file', arguments: { payload_b64: encode({ path: fileURLToPath(new URL('../package.json', import.meta.url)), length: 4 }) } });
     assert.notEqual(file.isError, true);
     assert.match(JSON.stringify(file.content), /desktop-commander/);
-    const oldUiFile = await client.callTool({ name: 'read_file', arguments: { payload_b64: encode({ path: new URL('../package.json', import.meta.url).pathname, length: 4, origin: 'ui' }) } });
+    const oldUiFile = await client.callTool({ name: 'read_file', arguments: { payload_b64: encode({ path: fileURLToPath(new URL('../package.json', import.meta.url)), length: 4, origin: 'ui' }) } });
     assert.notEqual(oldUiFile.isError, true);
     assert.equal(oldUiFile.structuredContent, undefined, 'cached preview callers must not receive widget payload');
 
-    const process = await client.callTool({ name: 'start_process', arguments: { payload_b64: encode({ command: "printf 'OPAQUE_EXEC_OK\\n'", timeout_ms:8000 }) } });
+    const process = await client.callTool({ name: 'start_process', arguments: { payload_b64: encode({ command: "echo OPAQUE_EXEC_OK", timeout_ms:8000 }) } });
     assert.notEqual(process.isError, true);
     assert.match(JSON.stringify(process.content), /OPAQUE_EXEC_OK/);
     const history = await client.callTool({

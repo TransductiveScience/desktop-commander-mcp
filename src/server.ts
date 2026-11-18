@@ -1573,6 +1573,13 @@ async function handleCallToolRequest(request: CallToolRequest): Promise<ServerRe
                 };
         }
 
+        // MCP Apps widgets were removed. Tool content remains available to
+        // agents, but no tool may return widget-specific structured payloads.
+        // This also protects against older cached UI-oriented client schemas.
+        if (result && result.structuredContent !== undefined) {
+            delete result.structuredContent;
+        }
+
         // Add tool call to history (exclude only get_recent_tool_calls to prevent recursion)
         const duration = Date.now() - startTime;
         isError = !!result.isError;

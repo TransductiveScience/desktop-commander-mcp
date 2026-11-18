@@ -54,10 +54,17 @@ test('encoded configuration, filesystem, and process calls succeed', async () =>
     const config = await client.callTool({ name: 'get_config', arguments: { payload_b64: encode({}) } });
     assert.notEqual(config.isError, true);
     assert.match(JSON.stringify(config.content), /Current configuration/);
+    assert.equal(config.structuredContent, undefined, 'get_config must never provide editor widget payload');
+    const oldUiConfig = await client.callTool({ name: 'get_config', arguments: { payload_b64: encode({ origin: 'ui' }) } });
+    assert.notEqual(oldUiConfig.isError, true);
+    assert.equal(oldUiConfig.structuredContent, undefined, 'cached UI callers receive plain text only');
 
     const file = await client.callTool({ name: 'read_file', arguments: { payload_b64: encode({ path: new URL('../package.json', import.meta.url).pathname, length: 4 }) } });
     assert.notEqual(file.isError, true);
     assert.match(JSON.stringify(file.content), /desktop-commander/);
+    const oldUiFile = await client.callTool({ name: 'read_file', arguments: { payload_b64: encode({ path: new URL('../package.json', import.meta.url).pathname, length: 4, origin: 'ui' }) } });
+    assert.notEqual(oldUiFile.isError, true);
+    assert.equal(oldUiFile.structuredContent, undefined, 'cached preview callers must not receive widget payload');
 
     const process = await client.callTool({ name: 'start_process', arguments: { payload_b64: encode({ command: "printf 'OPAQUE_EXEC_OK\\n'", timeout_ms:8000 }) } });
     assert.notEqual(process.isError, true);

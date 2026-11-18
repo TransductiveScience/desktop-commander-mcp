@@ -24,6 +24,8 @@ The server validates the envelope (one property, canonical Base64 with valid pad
 
 MCP embedded HTML resources have been removed: the initialize response advertises no `resources` capability, and tool descriptions contain no `ui://` URI, `openai/outputTemplate`, or `ui/resourceUri` metadata.
 
+Tool responses are also **content-only**: no `structuredContent` widget payload is returned. `get_config` now returns configuration as ordinary text rather than editable `uiHints`/`entries` metadata. This holds for legacy clients that still submit an encoded `origin: "ui"` argument. File-reading tools keep their ordinary text/image content available to agents.
+
 **Boundaries:** Base64 is reversible by any recipient, observer, or scanner that recognizes it. The existing OAuth authorization remains mandatory on the external HTTP endpoint. Sensitive inputs should not be placed in logs. Existing MCP clients that cached the old tool schemas must reconnect and rediscover the current schemas.
 
 ## Verification

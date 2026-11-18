@@ -1,89 +1,25 @@
 #!/usr/bin/env node
 /**
- * Build script that compiles and stages browser UI assets used by MCP tool pages. It centralizes bundling/runtime generation so UI resources are deterministic in local dev and CI.
+ * Embedded MCP Apps UI has been removed. This step exists for compatibility
+ * with older package build scripts, and removes any stale UI bundles emitted
+ * by a previous build. Keep the file-preview shared type modules intact.
  */
-const path = require('path');
-const fs = require('fs/promises');
-const { build } = require('esbuild');
-
-const target = process.argv[2];
-
-const TARGETS = {
-  'file-preview': {
-    entry: 'src/ui/file-preview/src/main.ts',
-    output: 'dist/ui/file-preview/preview-runtime.js',
-    staticDir: 'src/ui/file-preview',
-    styleLayers: [
-      'src/ui/styles/base.css',
-      'src/ui/styles/components/compact-row.css',
-      'src/ui/styles/apps/file-preview.css'
-    ]
-  },
-  'config-editor': {
-    entry: 'src/ui/config-editor/src/main.ts',
-    output: 'dist/ui/config-editor/config-editor-runtime.js',
-    staticDir: 'src/ui/config-editor',
-    styleLayers: [
-      'src/ui/styles/base.css',
-      'src/ui/styles/components/compact-row.css',
-      'src/ui/styles/apps/config-editor.css'
-    ]
-  }
-};
-
-const STATIC_FILES = ['index.html'];
-const projectRoot = path.resolve(__dirname, '..');
-
-const selectedTargets =
-  target
-    ? [target]
-    : Object.keys(TARGETS);
-
-if (target && !TARGETS[target]) {
-  console.error(
-    `Usage: node scripts/build-ui-runtime.cjs [${Object.keys(TARGETS).join('|')}]`
-  );
-  process.exit(1);
+const fs = require('node:fs');
+const path = require('node:path');
+const root = path.resolve(__dirname, '..');
+const obsolete = [
+  'dist/ui/contracts.js',
+  'dist/ui/contracts.d.ts',
+  'dist/ui/resources.js',
+  'dist/ui/resources.d.ts',
+  'dist/ui/config-editor/index.html',
+  'dist/ui/config-editor/styles.css',
+  'dist/ui/config-editor/config-editor-runtime.js',
+  'dist/ui/file-preview/index.html',
+  'dist/ui/file-preview/styles.css',
+  'dist/ui/file-preview/preview-runtime.js',
+];
+for (const relativePath of obsolete) {
+  fs.rmSync(path.join(root, relativePath), { force: true });
 }
-
-async function buildTarget(targetName) {
-  const { entry, output, staticDir, styleLayers } = TARGETS[targetName];
-  const outputPath = path.join(projectRoot, output);
-  const outputDir = path.dirname(outputPath);
-
-  await fs.mkdir(outputDir, { recursive: true });
-
-  for (const fileName of STATIC_FILES) {
-    await fs.copyFile(
-      path.join(projectRoot, staticDir, fileName),
-      path.join(outputDir, fileName)
-    );
-  }
-
-  const styles = await Promise.all(
-    styleLayers.map((layerPath) => fs.readFile(path.join(projectRoot, layerPath), 'utf8'))
-  );
-  await fs.writeFile(path.join(outputDir, 'styles.css'), `${styles.join('\n\n')}\n`, 'utf8');
-
-  await build({
-    entryPoints: [path.join(projectRoot, entry)],
-    bundle: true,
-    format: 'iife',
-    platform: 'browser',
-    target: ['es2020'],
-    outfile: outputPath,
-    minify: true,
-    sourcemap: false
-  });
-}
-
-async function main() {
-  for (const targetName of selectedTargets) {
-    await buildTarget(targetName);
-  }
-}
-
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+console.log('MCP embedded UI omitted; stale UI bundles removed.');

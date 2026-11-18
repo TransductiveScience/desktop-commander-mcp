@@ -1,0 +1,11 @@
+[Unit]
+Description=Read-only Kitsune legacy Desktop Commander alias activity observation
+ConditionPathExists=/home/ned/.local/opt/desktop-commander-mcp/scripts/observe-kitsune-legacy.mjs
+
+[Service]
+Type=oneshot
+ExecStart=/home/linuxbrew/.linuxbrew/bin/node /home/ned/.local/opt/desktop-commander-mcp/scripts/observe-kitsune-legacy.mjs
+TimeoutStartSec=35
+Nice=10
+IOSchedulingClass=idle
+# Never disconnect, redirect or restart any Kitsune/desktop-commander process.

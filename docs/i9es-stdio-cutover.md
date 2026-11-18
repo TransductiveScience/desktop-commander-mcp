@@ -27,4 +27,14 @@ The source is `scripts/audit-desktop-commander-processes.cjs`. It reads process 
 
 The original plaintext history must **not** be truncated or replaced while old writers exist. A separately verified 1,455-record snapshot and immutable incremental deltas preserve a reversible Base64 version. The user timer `dc-legacy-history-catchup.timer` runs every five minutes and validates all prior byte intervals before importing new complete records. Failures are visible in `dc-legacy-history-catchup.service` status and journal; the importer never restarts MCP processes.
 
+## Passive old-alias drain observer (18 November 2026)
+
+Because Kitsune's alias resolver chooses the **first matching live connection**, reconnecting a second server under the legacy name cannot safely reroute its clients. `Kitsune.reload` and `Kitsune.release` both terminate the older process.
+
+`scripts/observe-kitsune-legacy.mjs` uses a read-only call to Kitsune's local MCP `status` tool and stores only the old/new PIDs, per-connection call counts, and shared legacy file inode/size/mtime. It never reads or stores command contents and never invokes a release or reload. Records go to `~/.claude-server-commander/legacy-alias-observer.jsonl` (mode `0600`). Two fixture tests passed: `node --test test/observe-kitsune-legacy.test.mjs`.
+
+The owner-scoped `deploy/i9es/dc-legacy-alias-observer.service` and `.timer` were installed under `~/.config/systemd/user/`; the service's first run returned `Result=success` and `ExecMainStatus=0`. The timer was enabled for a 15-minute calendar, with the next trigger verified at **17:45 CET**. Initial readings: legacy PID `1822422`, **160 calls**; upgraded PID `2398586`, **61 calls**; legacy file `1,831,033` bytes and unchanged. This observer never authorizes retirement itself.
+
+**Retirement condition:** Observe stable counts over a meaningful drain window *and* establish that dependent clients have switched or disconnected. If that evidence cannot be obtained, leave the legacy alias running. Inactivity alone is insufficient.
+
 Base64 is reversible encoding, not encryption, and is not an authorization boundary. Production HTTP OAuth remains unchanged.

@@ -27,3 +27,11 @@ Built `dist/http/index.js` SHA-256:
 Both hashes matched the live i9ES installation. Its health endpoint returned HTTP 200 and unauthenticated `/mcp` returned HTTP 401. Production OAuth was not disabled or modified, and the running service was not restarted for this source snapshot.
 
 This is a deployment/source parity receipt, not a claim that Base64 is cryptographic protection. Base64 only encodes UTF-8 JSON arguments.
+
+## Opaque history isolation (18 November 2026)
+
+The active user service now has `deploy/i9es/96-opaque-history.conf` installed as a systemd drop-in, setting `DESKTOP_COMMANDER_TOOL_HISTORY_FILE` to `/home/ned/.claude-server-commander/tool-history-i9es-opaque.jsonl`. It retains its existing OAuth and `KillMode=process` settings. Source branch `f38ee6af2a3fb4052dc96c6fcec2dd44cc568cad` was deployed successfully and the service restarted with PID `2349717`; health returned HTTP 200. This documents host state, not a bundled history-data artifact.
+
+Before the cutover, `scripts/migrate-tool-history.cjs` produced an atomic read-only-source snapshot of the legacy shared history: 1,455 records, 1,426 plaintext inputs and outputs converted to Base64; all records passed reversible decode comparison. Snapshot destination SHA-256: `76c68197f861840332b62393754a9de570b4942b359c266c3f5a4dc1ca85280d`. After cutover, a direct `get_config` call increased the dedicated file to 1,456 records, all 1,456 having encoded arguments and outputs; permissions remained `0600`.
+
+**Legacy stream remains active:** Upstream and pre-cutover Desktop Commander instances may still append plaintext into the old `tool-history.jsonl` file. The original was deliberately not replaced, truncated, or deleted, and writes after the snapshot are not included in the dedicated file. A future coordinated retirement of the remaining legacy writers is needed before any archival deletion. The separate test unit `dc-opaque-path-test.service` was stopped after verification; the older shared `dc-opaque-shadow.service` was preserved.

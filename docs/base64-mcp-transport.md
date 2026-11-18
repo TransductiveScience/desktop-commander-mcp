@@ -34,6 +34,8 @@ Tool responses are also **content-only**: no `structuredContent` widget payload 
 
 **Snapshot migration:** Run `node scripts/migrate-tool-history.cjs SOURCE_JSONL DEST_JSONL` when DEST_JSONL does not already exist. The script takes a consistent source snapshot, checks every JSONL record, encodes complete inputs and outputs, verifies the decoding round trip for every record, and creates the destination atomically without modifying its source. The receipt includes record counts and SHA-256 hashes. Because old servers may continue appending to the original, the destination is explicitly a point-in-time snapshot; later old writes are not silently imported or deleted. The migration test is `node --test test/history-migration.test.cjs`.
 
+**Incremental legacy catch-up:** `node scripts/catchup-legacy-history.cjs SOURCE_JSONL DELTA_DIRECTORY VERIFIED_SNAPSHOT_BYTES VERIFIED_SNAPSHOT_SHA256` converts only records appended after the known immutable snapshot. Each run first verifies the original snapshot prefix, verifies all previously imported byte ranges, then writes a new private, immutable `delta-START-END-SHA.jsonl` file containing only complete JSONL records. Repeated runs are idempotent. Partial lines stay pending; source replacement, truncation, mutation, invalid JSON and missing ranges stop the importer without replacing the original. Delta files intentionally remain separate from the production server's active history file. This is not a replacement for retiring legacy writers. Tests: `node --test test/history-catchup.test.cjs test/history-migration.test.cjs`. Do not activate periodic importing until one real-source catch-up run and its receipts are verified.
+
 ## Verification
 
 Build: `npm run build`.

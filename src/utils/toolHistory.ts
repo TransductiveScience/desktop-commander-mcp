@@ -62,17 +62,19 @@ class ToolHistory {
   private writeInterval?: NodeJS.Timeout;
 
   constructor() {
-    // Store history in same directory as config to keep everything together
-    const historyDir = path.join(os.homedir(), '.claude-server-commander');
-    
-    // Ensure directory exists
-    if (!fs.existsSync(historyDir)) {
-      fs.mkdirSync(historyDir, { recursive: true });
+    // Explicit per-instance override prevents legacy npm/stdio MCP instances
+    // from appending plaintext records into the i9ES opaque history stream.
+    const configuredFile = process.env.DESKTOP_COMMANDER_TOOL_HISTORY_FILE?.trim();
+    const defaultFile = path.join(os.homedir(), '.claude-server-commander', 'tool-history.jsonl');
+    this.historyFile = configuredFile ? path.resolve(configuredFile) : defaultFile;
+    fs.mkdirSync(path.dirname(this.historyFile), { recursive: true });
+    if (configuredFile) {
+      // Fresh per-instance history is private even before its first tool call.
+      const file = fs.openSync(this.historyFile, 'a', 0o600);
+      fs.closeSync(file);
+      fs.chmodSync(this.historyFile, 0o600);
     }
-    
-    // Use append-only JSONL format (JSON Lines)
-    this.historyFile = path.join(historyDir, 'tool-history.jsonl');
-    
+
     // Load existing history on startup
     this.loadFromDisk();
     

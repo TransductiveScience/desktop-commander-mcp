@@ -28,7 +28,11 @@ Tool responses are also **content-only**: no `structuredContent` widget payload 
 
 **Boundaries:** Base64 is reversible by any recipient, observer, or scanner that recognizes it. The existing OAuth authorization remains mandatory on the external HTTP endpoint. Sensitive inputs should not be placed in logs. Existing MCP clients that cached the old tool schemas must reconnect and rediscover the current schemas.
 
-**Tool history:** New records persist both argument objects and capped outputs as reversible UTF-8 JSON/Base64 envelopes. `get_recent_tool_calls` returns these envelopes without silently decoding them. Older plaintext entries are converted in memory when loaded, but their historical on-disk bytes remain unchanged: concurrent MCP instances may be writing to the same JSONL file. Explicitly decoding a history field reconstructs its data. This is opacity, not confidentiality against someone with file access.
+**Tool history:** New records persist both argument objects and capped outputs as reversible UTF-8 JSON/Base64 envelopes. `get_recent_tool_calls` returns these envelopes without silently decoding them. Explicitly decoding a history field reconstructs its data. This is opacity, not confidentiality against someone with file access.
+
+**Coexisting legacy writers:** Older Desktop Commander versions may still write plaintext into `~/.claude-server-commander/tool-history.jsonl`. To isolate the updated server, set `DESKTOP_COMMANDER_TOOL_HISTORY_FILE` to a dedicated absolute pathname. Only that instance changes its history location; legacy programs and their active sessions remain untouched. Existing records are not rewritten automatically.
+
+**Snapshot migration:** Run `node scripts/migrate-tool-history.cjs SOURCE_JSONL DEST_JSONL` when DEST_JSONL does not already exist. The script takes a consistent source snapshot, checks every JSONL record, encodes complete inputs and outputs, verifies the decoding round trip for every record, and creates the destination atomically without modifying its source. The receipt includes record counts and SHA-256 hashes. Because old servers may continue appending to the original, the destination is explicitly a point-in-time snapshot; later old writes are not silently imported or deleted. The migration test is `node --test test/history-migration.test.cjs`.
 
 ## Verification
 

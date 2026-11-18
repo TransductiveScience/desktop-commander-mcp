@@ -30,12 +30,12 @@ export const CONFIG_FIELD_DEFINITIONS = {
   },
   fileReadLineLimit: {
     label: 'File Read Limit',
-    description: 'Maximum number of lines returned from a file in one read action. Lower numbers keep responses short and safer; higher numbers return more text at once.',
+    description: 'Default number of lines returned by file and process reads. Zero means unlimited (the default); positive values enable pagination.',
     valueType: 'number',
   },
   fileWriteLineLimit: {
     label: 'File Write Limit',
-    description: 'Maximum number of lines that can be written in one edit operation. This helps prevent accidental oversized writes and keeps file changes predictable.',
+    description: 'Line count above which writes and edits show a chunking tip. Zero disables these tips (the default); writes are still allowed above a positive limit.',
     valueType: 'number',
   },
   maxProcessWaitMs: {

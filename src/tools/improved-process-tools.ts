@@ -5,7 +5,8 @@ import { capture } from "../utils/capture.js";
 import { ServerResult } from '../types.js';
 import { analyzeProcessState, cleanProcessOutput, formatProcessStateMessage, ProcessState } from '../utils/process-detection.js';
 import * as os from 'os';
-import { configManager } from '../config-manager.js';
+import { execFileSync } from 'child_process';
+import { configManager, resolveLineLimit } from '../config-manager.js';
 import { spawn } from 'child_process';
 import fs from 'fs/promises';
 import path from 'path';
@@ -124,6 +125,21 @@ export async function startProcess(args: unknown): Promise<ServerResult> {
       content: [{ type: "text", text: `Error: Command not allowed: ${parsed.data.command}` }],
       isError: true,
     };
+  }
+
+  // Pressure-aware admission for explicit recursive scans of /mnt/SERVE.
+  // The Python classifier is non-executing. Fail closed if it fails: an
+  // unavailable guard must not silently permit an unbounded HDD scan.
+  if (os.platform() === 'linux' && parsed.data.command.includes('/mnt/SERVE')) {
+    try {
+      execFileSync(process.env.DC_SERVE_PREFLIGHT_HELPER || '/home/ned/.local/bin/serve-command-preflight.py',
+        [parsed.data.command], { timeout: 1500, stdio: 'pipe' });
+    } catch (error: any) {
+      const deferred = error?.status === 75;
+      return { content: [{ type: 'text', text: deferred
+        ? 'SERVE recursive scan deferred: I/O pressure above admission threshold. Use bounded paths or retry later (exit 75).'
+        : 'SERVE admission preflight unavailable: command not started. Repair the local classifier or use a bounded path.' }], isError: true };
+    }
   }
 
   const commandToRun = parsed.data.command;
@@ -251,7 +267,7 @@ export async function readProcessOutput(args: unknown): Promise<ServerResult> {
 
   // Get default line limit from config
   const config = await configManager.getConfig();
-  const defaultLength = config.fileReadLineLimit ?? 1000;
+  const defaultLength = resolveLineLimit(config.fileReadLineLimit);
 
   const { 
     pid, 
@@ -413,7 +429,7 @@ export async function interactWithProcess(args: unknown): Promise<ServerResult> 
 
   // Get config for output line limit
   const config = await configManager.getConfig();
-  const maxOutputLines = config.fileReadLineLimit ?? 1000;
+  const maxOutputLines = resolveLineLimit(config.fileReadLineLimit);
   const responseWaitMs = effectiveProcessWaitMs(timeout_ms, config.maxProcessWaitMs);
 
   // Check if this is a virtual Node session (node:local)

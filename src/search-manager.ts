@@ -66,6 +66,21 @@ export interface SearchSessionOptions {
   }> {
     const sessionId = `search_${++this.sessionCounter}_${Date.now()}`;
     
+    // Native start_search bypasses start_process, so admit it independently.
+    // A missing pressure reading is treated as unsafe for a broad SERVE walk.
+    if (process.platform === 'linux' &&
+        (path.resolve(options.rootPath) === '/mnt/SERVE' || path.resolve(options.rootPath).startsWith('/mnt/SERVE/'))) {
+      let pressure: number | undefined;
+      try {
+        const text = await fs.readFile('/proc/pressure/io', 'utf8');
+        const match = text.match(/^full\s+avg10=([\d.]+)/m);
+        if (match) pressure = Number(match[1]);
+      } catch { /* Unknown pressure: defer */ }
+      if (pressure === undefined || !Number.isFinite(pressure) || pressure >= 10) {
+        throw new Error(`SERVE_SEARCH_PRESSURE_DEFERRED: full avg10=${pressure ?? 'unknown'}; choose narrower paths or retry later`);
+      }
+    }
+
     // Validate path first
     const validPath = await validatePath(options.rootPath);
 

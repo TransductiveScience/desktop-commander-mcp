@@ -11,12 +11,19 @@ export interface ServerConfig {
   defaultShell?: string;
   allowedDirectories?: string[];
   telemetryEnabled?: boolean; // New field for telemetry control
-  fileWriteLineLimit?: number; // Line limit for file write operations
-  fileReadLineLimit?: number; // Default line limit for file read operations (changed from character-based)
+  fileWriteLineLimit?: number; // 0 or unset means unlimited
+  fileReadLineLimit?: number; // 0 or unset means unlimited
   maxProcessWaitMs?: number; // Maximum time a process tool call waits before handing control back
   clientId?: string; // Unique client identifier for analytics
   currentClient?: ClientInfo; // Current connected client information
   [key: string]: any; // Allow for arbitrary configuration keys (including abTest_* keys)
+}
+
+/** Resolve an optional line limit; zero or unset means all available lines. */
+export function resolveLineLimit(value?: number): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+    ? value
+    : Number.MAX_SAFE_INTEGER;
 }
 
 export interface ClientInfo {
@@ -127,51 +134,7 @@ class ConfigManager {
    */
   private getDefaultConfig(): ServerConfig {
     return {
-      blockedCommands: [
-
-        // Disk and partition management
-        "mkfs",      // Create a filesystem on a device
-        "format",    // Format a storage device (cross-platform)
-        "mount",     // Mount a filesystem
-        "umount",    // Unmount a filesystem
-        "fdisk",     // Manipulate disk partition tables
-        "dd",        // Convert and copy files, can write directly to disks
-        "parted",    // Disk partition manipulator
-        "diskpart",  // Windows disk partitioning utility
-        
-        // System administration and user management
-        "sudo",      // Execute command as superuser
-        "su",        // Substitute user identity
-        "passwd",    // Change user password
-        "adduser",   // Add a user to the system
-        "useradd",   // Create a new user
-        "usermod",   // Modify user account
-        "groupadd",  // Create a new group
-        "chsh",      // Change login shell
-        "visudo",    // Edit the sudoers file
-        
-        // System control
-        "shutdown",  // Shutdown the system
-        "reboot",    // Restart the system
-        "halt",      // Stop the system
-        "poweroff",  // Power off the system
-        "init",      // Change system runlevel
-        
-        // Network and security
-        "iptables",  // Linux firewall administration
-        "firewall",  // Generic firewall command
-        "netsh",     // Windows network configuration
-        
-        // Windows system commands
-        "sfc",       // System File Checker
-        "bcdedit",   // Boot Configuration Data editor
-        "reg",       // Windows registry editor
-        "net",       // Network/user/service management
-        "sc",        // Service Control manager
-        "runas",     // Execute command as another user
-        "cipher",    // Encrypt/decrypt files or wipe data
-        "takeown"    // Take ownership of files
-      ],
+      blockedCommands: [],
       defaultShell: (() => {
         if (os.platform() === 'win32') {
           return 'powershell.exe';
@@ -186,8 +149,8 @@ class ConfigManager {
       })(),
       allowedDirectories: [],
       telemetryEnabled: true, // Default to opt-out approach (telemetry on by default)
-      fileWriteLineLimit: 50,  // Default line limit for file write operations (changed from 100)
-      fileReadLineLimit: 1000,  // Default line limit for file read operations (changed from character-based)
+      fileWriteLineLimit: 0,  // 0 disables the line limit
+      fileReadLineLimit: 0,  // 0 returns all available lines by default
       maxProcessWaitMs: 10000, // Releasing a tool call never terminates its child process
       pendingWelcomeOnboarding: true, // New install flag - triggers A/B test for welcome page
       welcomeOnboardingEligible: true // Distinguishes new installs from migrated legacy configs

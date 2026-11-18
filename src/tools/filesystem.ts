@@ -6,7 +6,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { capture } from '../utils/capture.js';
 import { withTimeout, runWithAbortableTimeout } from '../utils/withTimeout.js';
-import { configManager } from '../config-manager.js';
+import { configManager, resolveLineLimit } from '../config-manager.js';
 import { getFileHandler, TextFileHandler } from '../utils/files/index.js';
 import type { ReadOptions, FileResult, PdfPageItem } from '../utils/files/base.js';
 import { isPdfFile } from "./mime-types.js";
@@ -62,7 +62,7 @@ function getFileExtension(filePath: string): string {
  */
 async function getDefaultReadLength(): Promise<number> {
     const config = await configManager.getConfig();
-    return config.fileReadLineLimit ?? 1000; // Default to 1000 lines if not set
+    return resolveLineLimit(config.fileReadLineLimit);
 }
 
 /**
@@ -587,7 +587,7 @@ export async function readFile(
  * which is essential for edit operations that need to maintain file formatting.
  * @param filePath Path to the file
  * @param offset Starting line number to read from (default: 0)
- * @param length Maximum number of lines to read (default: from config or 1000)
+ * @param length Maximum number of lines to read (default: from config, unlimited when zero or unset)
  * @returns File content without status headers, with preserved line endings
  */
 export async function readFileInternal(filePath: string, offset: number = 0, length?: number): Promise<string> {
@@ -718,12 +718,25 @@ export async function createDirectory(dirPath: string): Promise<void> {
 }
 
 export async function listDirectory(dirPath: string, depth: number = 2): Promise<string[]> {
+    // Prevent recursive NTFS metadata walks before validatePath touches the HDD.
+    // A depth-1 listing remains available for bounded navigation.
+    const lexicalPath = path.resolve(dirPath);
+    if (process.platform === 'linux' && depth > 1 &&
+        (lexicalPath === '/mnt/SERVE' || lexicalPath.startsWith('/mnt/SERVE/'))) {
+        let psi: number | undefined;
+        try {
+            const pressureText = await fs.readFile('/proc/pressure/io', 'utf8');
+            const match = pressureText.match(/^full\s+avg10=([\d.]+)/m);
+            if (match) psi = Number(match[1]);
+        } catch { /* Unknown pressure: defer recursive listing */ }
+        if (psi === undefined || !Number.isFinite(psi) || psi >= 10) {
+            throw new Error(`SERVE_LIST_PRESSURE_DEFERRED: full avg10=${psi ?? 'unknown'}; use depth=1 or retry later`);
+        }
+    }
     const validPath = await validatePath(dirPath);
     const results: string[] = [];
 
-    const MAX_NESTED_ITEMS = 100; // Maximum items to show per nested directory
-
-    async function listRecursive(currentPath: string, currentDepth: number, relativePath: string = '', isTopLevel: boolean = true): Promise<void> {
+    async function listRecursive(currentPath: string, currentDepth: number, relativePath: string = ''): Promise<void> {
         if (currentDepth <= 0) return;
 
         let entries;
@@ -743,17 +756,7 @@ export async function listDirectory(dirPath: string, depth: number = 2): Promise
             return;
         }
 
-        // Apply filtering for nested directories (not top level)
-        const totalEntries = entries.length;
-        let entriesToShow = entries;
-        let filteredCount = 0;
-
-        if (!isTopLevel && totalEntries > MAX_NESTED_ITEMS) {
-            entriesToShow = entries.slice(0, MAX_NESTED_ITEMS);
-            filteredCount = totalEntries - MAX_NESTED_ITEMS;
-        }
-
-        for (const entry of entriesToShow) {
+        for (const entry of entries) {
             const fullPath = path.join(currentPath, entry.name);
             const displayPath = relativePath ? path.join(relativePath, entry.name) : entry.name;
 
@@ -765,7 +768,7 @@ export async function listDirectory(dirPath: string, depth: number = 2): Promise
                 try {
                     // Validate the path before recursing
                     await validatePath(fullPath);
-                    await listRecursive(fullPath, currentDepth - 1, displayPath, false);
+                    await listRecursive(fullPath, currentDepth - 1, displayPath);
                 } catch (error) {
                     // If validation fails or we can't access it, it will be marked as denied
                     // when we try to read it in the recursive call
@@ -773,15 +776,9 @@ export async function listDirectory(dirPath: string, depth: number = 2): Promise
                 }
             }
         }
-
-        // Add warning message if items were filtered
-        if (filteredCount > 0) {
-            const displayPath = relativePath || path.basename(currentPath);
-            results.push(`[WARNING] ${displayPath}: ${filteredCount} items hidden (showing first ${MAX_NESTED_ITEMS} of ${totalEntries} total)`);
-        }
     }
 
-    await listRecursive(validPath, depth, '', true);
+    await listRecursive(validPath, depth);
     return results;
 }
 
@@ -849,6 +846,10 @@ export async function searchFiles(rootPath: string, pattern: string): Promise<st
 
         return allResults;
     } catch (error) {
+        // Never bypass pressure admission by falling back to a recursive Node walk.
+        if (error instanceof Error && error.message.startsWith('SERVE_SEARCH_PRESSURE_DEFERRED:')) {
+            throw error;
+        }
         // Fallback to original Node.js implementation if ripgrep fails
         capture('server_search_files_ripgrep_fallback', {
             error: error instanceof Error ? error.message : 'Unknown error'

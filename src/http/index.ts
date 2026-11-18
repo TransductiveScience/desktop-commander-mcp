@@ -90,6 +90,17 @@ export async function runHttpServer(): Promise<void> {
         try {
             const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
 
+            // Loopback-only, non-sensitive session count for coordinated handoffs.
+            // Never expose session identifiers or token data.
+            if (req.method === 'GET' && url.pathname === '/internal/session-count') {
+                const peer = req.socket.remoteAddress;
+                if (peer !== '127.0.0.1' && peer !== '127.0.0.2' && peer !== '::1' && peer !== '::ffff:127.0.0.1' && peer !== '::ffff:127.0.0.2') {
+                    writeJson(res, 403, { error: 'Forbidden' });
+                    return;
+                }
+                writeJson(res, 200, { sessions: router.sessionCount(), pid: process.pid });
+                return;
+            }
             if (req.method === 'GET' && url.pathname === '/healthz') {
                 writeJson(res, 200, { ok: true, build: buildInfo });
                 return;
@@ -154,12 +165,46 @@ export async function runHttpServer(): Promise<void> {
         }
     });
 
-    const shutdown = async () => {
-        await router.cleanup();
-        await new Promise<void>(resolve => nodeServer.close(() => resolve()));
+    let shuttingDown = false;
+    const shutdown = () => {
+        if (shuttingDown) return;
+        shuttingDown = true;
+        let cleanupComplete = false;
+        let httpClosed = false;
+        const deadline = setTimeout(() => {
+            const pending = [
+                ...(!cleanupComplete ? ['router cleanup'] : []),
+                ...(!httpClosed ? ['HTTP close'] : []),
+            ].join(' and ');
+            process.stderr.write(`[Desktop Commander HTTP] Shutdown grace period elapsed: ${pending} pending\n`);
+            nodeServer.closeAllConnections();
+            process.exit(1);
+        }, 5000);
+
+        // Stop accepting immediately; drain HTTP and transports under one deadline.
+        const httpClose = new Promise<void>((resolve, reject) => {
+            nodeServer.close(error => {
+                if (error) { reject(error); return; }
+                httpClosed = true;
+                resolve();
+            });
+        });
+        const cleanup = Promise.resolve().then(() => router.cleanup()).then(() => {
+            cleanupComplete = true;
+        });
+        // Observe both promises immediately, including late cleanup rejections.
+        void Promise.all([cleanup, httpClose]).then(() => {
+            clearTimeout(deadline);
+            process.exit(0);
+        }, error => {
+            clearTimeout(deadline);
+            process.stderr.write(`[Desktop Commander HTTP] Shutdown failed: ${error instanceof Error ? error.stack || error.message : String(error)}\n`);
+            nodeServer.closeAllConnections();
+            process.exit(1);
+        });
     };
-    process.once('SIGINT', () => { void shutdown().finally(() => process.exit(0)); });
-    process.once('SIGTERM', () => { void shutdown().finally(() => process.exit(0)); });
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
 
     nodeServer.listen(port, host);
     await new Promise<void>((resolve, reject) => {

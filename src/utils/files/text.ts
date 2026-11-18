@@ -52,7 +52,7 @@ export class TextFileHandler implements FileHandler {
 
     async read(filePath: string, options?: ReadOptions): Promise<FileResult> {
         const offset = options?.offset ?? 0;
-        const length = options?.length ?? 1000; // Default from config
+        const length = options?.length ?? Number.MAX_SAFE_INTEGER; // No default truncation
         const includeStatusMessage = options?.includeStatusMessage ?? true;
 
         // Binary detection is done at factory level - just read as text

@@ -53,9 +53,10 @@ async function main() {
     }
     process.env.DESKTOP_COMMANDER_HTTP_HOST = argumentValue('--host') || process.env.DESKTOP_COMMANDER_HTTP_HOST || '127.0.0.1';
     process.env.DESKTOP_COMMANDER_HTTP_PORT = argumentValue('--port') || process.env.DESKTOP_COMMANDER_HTTP_PORT || '9180';
-    const fallbackPort = argumentValue('--process-fallback-port') || process.env.DESKTOP_COMMANDER_PROCESS_FALLBACK_PORT;
-    if (/^\d+$/.test(fallbackPort || '') && Number(fallbackPort) >= 1 && Number(fallbackPort) <= 65535) {
-        process.env.DESKTOP_COMMANDER_PROCESS_FALLBACK_PORT = fallbackPort;
+    const processFallbackPort = argumentValue('--process-fallback-port')
+        || process.env.DESKTOP_COMMANDER_PROCESS_FALLBACK_PORT;
+    if (processFallbackPort && processFallbackPort !== 'undefined') {
+        process.env.DESKTOP_COMMANDER_PROCESS_FALLBACK_PORT = processFallbackPort;
     } else {
         delete process.env.DESKTOP_COMMANDER_PROCESS_FALLBACK_PORT;
     }

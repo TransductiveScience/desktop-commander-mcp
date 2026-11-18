@@ -5,6 +5,7 @@ import { DEFAULT_COMMAND_TIMEOUT } from './config.js';
 import { configManager } from './config-manager.js';
 import {capture} from "./utils/capture.js";
 import { analyzeProcessState } from './utils/process-detection.js';
+import { classifyFreezelessSearch } from './utils/freezeless-search-policy.js';
 
 /**
  * Standard Windows PATHEXT value, used to repair a corrupted PATHEXT before
@@ -264,6 +265,17 @@ export class TerminalManager {
     // because PowerShell/pwsh have different quote rules and must NOT use verbatim.
     if (process.platform === 'win32' && spawnConfig.windowsVerbatim) {
       spawnOptions.windowsVerbatimArguments = true;
+    }
+
+    // FREEZELESS opt-in only: route a narrowly parsed standalone rg search to
+    // an execution-limited helper. Preserve all other commands and live sessions.
+    // Never enable globally until isolated process tests establish parity.
+    if (process.platform === 'linux' && process.env.FREEZELESS_BOUNDED_SEARCH === '1') {
+      const policy = classifyFreezelessSearch(command);
+      if (policy) {
+        spawnConfig = { executable: policy.argv[0], args: policy.argv.slice(1), useShellOption: false };
+        spawnOptions.shell = false;
+      }
     }
 
     // Spawn the process with appropriate arguments

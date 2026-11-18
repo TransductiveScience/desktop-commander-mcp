@@ -16,7 +16,7 @@ import type { ReadOptions } from '../utils/files/base.js';
 import { ServerResult } from '../types.js';
 import { withTimeout } from '../utils/withTimeout.js';
 import { createErrorResponse } from '../error-handlers.js';
-import { configManager } from '../config-manager.js';
+import { configManager, resolveLineLimit } from '../config-manager.js';
 
 import {
     ReadFileArgsSchema,
@@ -90,7 +90,7 @@ export async function handleReadFile(args: unknown): Promise<ServerResult> {
             return createErrorResponse('Configuration not available');
         }
 
-        const defaultLimit = config.fileReadLineLimit ?? 1000;
+        const defaultLimit = resolveLineLimit(config.fileReadLineLimit);
 
         // Convert sheet parameter: numeric strings become numbers for Excel index access
         let sheetParam: string | number | undefined = parsed.sheet;
@@ -333,9 +333,9 @@ export async function handleWriteFile(args: unknown): Promise<ServerResult> {
 
         // Get the line limit from configuration
         const config = await configManager.getConfig();
-        const MAX_LINES = config.fileWriteLineLimit ?? 50; // Default to 50 if not set
+        const MAX_LINES = resolveLineLimit(config.fileWriteLineLimit);
 
-        // Strictly enforce line count limit
+        // Offer a chunking tip only when a finite line limit is configured
         const lines = parsed.content.split('\n');
         const lineCount = lines.length;
         let errorMessage = "";

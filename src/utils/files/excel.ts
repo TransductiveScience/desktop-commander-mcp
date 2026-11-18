@@ -14,8 +14,8 @@ import {
     ExcelSheet
 } from './base.js';
 
-// File size limit: 10MB
-const FILE_SIZE_LIMIT = 10 * 1024 * 1024;
+// Informational threshold for large-file metadata; not an access limit.
+const LARGE_FILE_THRESHOLD = 10 * 1024 * 1024;
 
 /**
  * Excel file metadata (internal use only)
@@ -38,8 +38,6 @@ export class ExcelFileHandler implements FileHandler {
     }
 
     async read(path: string, options?: ReadOptions): Promise<FileResult> {
-        await this.checkFileSize(path);
-
         const workbook = new ExcelJS.Workbook();
         await workbook.xlsx.readFile(path);
 
@@ -77,17 +75,6 @@ ${JSON.stringify(data)}`;
     }
 
     async write(path: string, content: any, mode?: 'rewrite' | 'append'): Promise<void> {
-        // Check existing file size if it exists
-        try {
-            await this.checkFileSize(path);
-        } catch (error) {
-            // File doesn't exist - that's fine for write
-            if ((error as any).code !== 'ENOENT' &&
-                !(error instanceof Error && error.message.includes('ENOENT'))) {
-                throw error;
-            }
-        }
-
         // Parse content
         let parsedContent = content;
         if (typeof content === 'string') {
@@ -158,9 +145,9 @@ ${JSON.stringify(data)}`;
     }
 
     async editRange(path: string, range: string, content: any, options?: Record<string, any>): Promise<EditResult> {
-        // Verify file exists and check size
+        // Verify file exists without imposing a file-size ceiling.
         try {
-            await this.checkFileSize(path);
+            await fs.access(path);
         } catch (error) {
             if ((error as any).code === 'ENOENT' ||
                 (error instanceof Error && error.message.includes('ENOENT'))) {
@@ -283,17 +270,6 @@ ${JSON.stringify(data)}`;
 
     // ========== Private Helpers ==========
 
-    private async checkFileSize(path: string): Promise<void> {
-        const stats = await fs.stat(path);
-        if (stats.size > FILE_SIZE_LIMIT) {
-            const sizeMB = (stats.size / 1024 / 1024).toFixed(1);
-            throw new Error(
-                `Excel file size (${sizeMB}MB) exceeds 10MB limit. ` +
-                `Consider using specialized tools for large file processing.`
-            );
-        }
-    }
-
     private async extractMetadata(workbook: ExcelJS.Workbook, path: string): Promise<ExcelMetadata> {
         const stats = await fs.stat(path);
 
@@ -306,7 +282,7 @@ ${JSON.stringify(data)}`;
         return {
             sheets,
             fileSize: stats.size,
-            isLargeFile: stats.size > FILE_SIZE_LIMIT
+            isLargeFile: stats.size > LARGE_FILE_THRESHOLD
         };
     }
 

@@ -42,7 +42,7 @@ export async function getConfig() {
       }
     };
     
-    console.error(`getConfig result: ${JSON.stringify(configWithSystemInfo, null, 2)}`);
+    console.error('getConfig completed (contents omitted from diagnostic log)');
     return {
       content: [{
         type: "text",
@@ -66,11 +66,11 @@ export async function getConfig() {
  * Set a specific config value
  */
 export async function setConfigValue(args: unknown) {
-  console.error(`setConfigValue called with args: ${JSON.stringify(args)}`);
+  console.error('setConfigValue called (values omitted from diagnostic log)');
   try {
     const parsed = SetConfigValueArgsSchema.safeParse(args);
     if (!parsed.success) {
-      console.error(`Invalid arguments for set_config_value: ${parsed.error}`);
+      console.error('Invalid arguments for set_config_value (details omitted from diagnostic log)');
       return {
         content: [{
           type: "text",
@@ -100,7 +100,7 @@ export async function setConfigValue(args: unknown) {
           (valueToStore.startsWith('[') || valueToStore.startsWith('{'))) {
         try {
           valueToStore = JSON.parse(valueToStore);
-          console.error(`Parsed string value to object/array: ${JSON.stringify(valueToStore)}`);
+          console.error('Parsed string config value (contents omitted from diagnostic log)');
         } catch (parseError) {
           console.error(`Failed to parse string as JSON, using as-is: ${parseError}`);
         }
@@ -157,7 +157,7 @@ export async function setConfigValue(args: unknown) {
       await configManager.setValue(parsed.data.key, valueToStore);
       // Get the updated configuration to show the user
       const updatedConfig = await configManager.getConfig();
-      console.error(`setConfigValue: Successfully set ${parsed.data.key} to ${JSON.stringify(valueToStore)}`);
+      console.error(`setConfigValue: Successfully set ${parsed.data.key} (value omitted)`);
       return {
         content: [{
           type: "text",

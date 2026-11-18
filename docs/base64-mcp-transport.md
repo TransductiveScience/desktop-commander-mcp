@@ -28,6 +28,8 @@ Tool responses are also **content-only**: no `structuredContent` widget payload 
 
 **Boundaries:** Base64 is reversible by any recipient, observer, or scanner that recognizes it. The existing OAuth authorization remains mandatory on the external HTTP endpoint. Sensitive inputs should not be placed in logs. Existing MCP clients that cached the old tool schemas must reconnect and rediscover the current schemas.
 
+**Tool history:** New records persist both argument objects and capped outputs as reversible UTF-8 JSON/Base64 envelopes. `get_recent_tool_calls` returns these envelopes without silently decoding them. Older plaintext entries are converted in memory when loaded, but their historical on-disk bytes remain unchanged: concurrent MCP instances may be writing to the same JSONL file. Explicitly decoding a history field reconstructs its data. This is opacity, not confidentiality against someone with file access.
+
 ## Verification
 
 Build: `npm run build`.

@@ -113,7 +113,7 @@ class ToolHistory {
       // for everyone it was written for.
       this.history = records
         .slice(-this.MAX_ENTRIES)
-        .map(record => ({ ...record, output: this.capOutput(record.output) }));
+        .map(record => this.toOpaqueRecord(record));
 
       // If file is getting too large, trim it
       if (lines.length > this.MAX_ENTRIES * 2) {
@@ -266,19 +266,55 @@ class ToolHistory {
     } as ServerResult;
   }
 
+  /**
+   * Keep decoded inputs and outputs out of the persistence and history APIs.
+   * Base64 is intentionally reversible, not encryption: an agent must opt in
+   * to decoding the historical JSON to inspect commands or file contents.
+   * Existing plaintext records are normalized on load but not rewritten on disk.
+   */
+  private toOpaqueRecord(record: ToolCallRecord): ToolCallRecord {
+    const encode = (value: unknown): string =>
+      Buffer.from(JSON.stringify(value) ?? 'null', 'utf8').toString('base64');
+
+    const rawArgs = record.arguments;
+    const argsAlreadyEncoded =
+      rawArgs !== null && typeof rawArgs === 'object' && !Array.isArray(rawArgs) &&
+      Object.keys(rawArgs).length === 1 && typeof rawArgs.payload_b64 === 'string';
+    const rawOutput = record.output;
+    const firstText = rawOutput?.content?.[0];
+    const outputAlreadyEncoded =
+      firstText?.type === 'text' &&
+      typeof firstText.text === 'string' &&
+      firstText.text.startsWith('[opaque-history;json-base64] ');
+
+    return {
+      ...record,
+      arguments: argsAlreadyEncoded ? rawArgs : { payload_b64: encode(rawArgs) },
+      output: outputAlreadyEncoded
+        ? rawOutput
+        : {
+          content: [{
+            type: 'text',
+            text: '[opaque-history;json-base64] ' + encode(this.capOutput(rawOutput)),
+          }],
+          ...(rawOutput?.isError ? { isError: true } : {}),
+        },
+    };
+  }
+
   addCall(
     toolName: string,
     args: any,
     output: ServerResult,
     duration?: number
   ): void {
-    const record: ToolCallRecord = {
+    const record: ToolCallRecord = this.toOpaqueRecord({
       timestamp: new Date().toISOString(),
       toolName,
       arguments: args,
-      output: this.capOutput(output),
+      output,
       duration
-    };
+    });
 
     this.history.push(record);
 

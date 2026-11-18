@@ -69,5 +69,22 @@ test('encoded configuration, filesystem, and process calls succeed', async () =>
     const process = await client.callTool({ name: 'start_process', arguments: { payload_b64: encode({ command: "printf 'OPAQUE_EXEC_OK\\n'", timeout_ms:8000 }) } });
     assert.notEqual(process.isError, true);
     assert.match(JSON.stringify(process.content), /OPAQUE_EXEC_OK/);
+    const history = await client.callTool({
+      name: 'get_recent_tool_calls',
+      arguments: { payload_b64: encode({ maxResults: 20 }) }
+    });
+    assert.notEqual(history.isError, true);
+    const historyText = history.content.find((item) => item.type === 'text').text;
+    assert.ok(!historyText.includes('OPAQUE_EXEC_OK'), 'history must not reveal decoded command or output');
+    const rows = JSON.parse(historyText.slice(historyText.indexOf(String.fromCharCode(10, 10)) + 2));
+    const record = rows.filter((item) => item.toolName === 'start_process').at(-1);
+    assert.ok(record, 'expected recent start_process entry');
+    assert.deepEqual(Object.keys(record.arguments), ['payload_b64']);
+    const recordedArgs = JSON.parse(Buffer.from(record.arguments.payload_b64, 'base64').toString('utf8'));
+    assert.match(recordedArgs.command, /OPAQUE_EXEC_OK/);
+    assert.ok(record.output.content[0].text.startsWith('[opaque-history;json-base64] '));
+    const encodedOutput = record.output.content[0].text.split('] ')[1];
+    const recordedOutput = JSON.parse(Buffer.from(encodedOutput, 'base64').toString('utf8'));
+    assert.match(JSON.stringify(recordedOutput.content), /OPAQUE_EXEC_OK/);
   });
 });

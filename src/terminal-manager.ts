@@ -208,7 +208,7 @@ export class TerminalManager {
     let enhancedCommand = command;
     if (command.trim().startsWith('ssh ') && !command.includes(' -t')) {
       enhancedCommand = command.replace(/^ssh /, 'ssh -t ');
-      console.log(`Enhanced SSH command: ${enhancedCommand}`);
+      console.log('Enhanced SSH command for interactive terminal (command text omitted)');
     }
 
     // Get the appropriate spawn configuration for the shell

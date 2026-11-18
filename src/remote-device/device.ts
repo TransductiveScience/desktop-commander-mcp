@@ -293,7 +293,7 @@ export class MCPDevice {
             return;
         }
 
-        console.log(`🔧 Received tool call ${call_id}: ${tool_name} ${JSON.stringify(tool_args)} metadata: ${JSON.stringify(metadata)}`);
+        console.log(`Received tool call ${call_id}: ${tool_name} (arguments and metadata omitted)`);
 
         // LOCAL claim first — this is the authoritative guard against executing
         // a call twice. During the transition both transports deliver every call

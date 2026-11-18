@@ -35,3 +35,11 @@ The active user service now has `deploy/i9es/96-opaque-history.conf` installed a
 Before the cutover, `scripts/migrate-tool-history.cjs` produced an atomic read-only-source snapshot of the legacy shared history: 1,455 records, 1,426 plaintext inputs and outputs converted to Base64; all records passed reversible decode comparison. Snapshot destination SHA-256: `76c68197f861840332b62393754a9de570b4942b359c266c3f5a4dc1ca85280d`. After cutover, a direct `get_config` call increased the dedicated file to 1,456 records, all 1,456 having encoded arguments and outputs; permissions remained `0600`.
 
 **Legacy stream remains active:** Upstream and pre-cutover Desktop Commander instances may still append plaintext into the old `tool-history.jsonl` file. The original was deliberately not replaced, truncated, or deleted, and writes after the snapshot are not included in the dedicated file. A future coordinated retirement of the remaining legacy writers is needed before any archival deletion. The separate test unit `dc-opaque-path-test.service` was stopped after verification; the older shared `dc-opaque-shadow.service` was preserved.
+
+## Legacy writer transition (18 November 2026)
+
+A second updated stdio connection, `dc-i9es-stdio-opaque`, was created through Kitsune (initial PID `2398586`). It exposes the same 26 Base64-only MCP operations, is independently usable, and writes to `~/.claude-server-commander/tool-history-i9es-stdio-opaque.jsonl` with mode `0600`. This leaves existing Kitsune and upstream npm processes alive; it does not redirect their active clients.
+
+The original shared history prefix at **1,713,763 bytes** still had SHA-256 `267668a7eda5505e89a602d6969a6aa1755fddde49774231a580ea59824c8147`. Source-preserving incremental capture is implemented by `scripts/catchup-legacy-history.cjs`, with four fixture tests passing across the initial migration and the incremental importer. The attempted first import against the live source was blocked by the execution gateway, so no live delta-capture receipt exists yet. No recurring timer was installed. The old shared history remains intact.
+
+Remaining work: verify the first real-source catch-up, then transition active legacy Kitsune callers to the updated stdio alias when those sessions can safely reconnect. Never terminate these processes solely on the basis of their executable name.

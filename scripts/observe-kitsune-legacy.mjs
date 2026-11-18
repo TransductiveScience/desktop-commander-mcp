@@ -36,6 +36,58 @@ export function makeObservation(text, legacyFile, timestamp = new Date().toISOSt
   };
 }
 
+// Last observation is small (<1KB). Bound disk reads even after years of runs.
+export function readLastObservation(filename) {
+  let fd;
+  try {
+    fd = fs.openSync(filename, 'r');
+  } catch (e) {
+    if (e?.code === 'ENOENT') return null;
+    throw e;
+  }
+  try {
+    const size = fs.fstatSync(fd).size;
+    if (size === 0) return null;
+    const length = Math.min(size, 8192);
+    const buffer = Buffer.alloc(length);
+    fs.readSync(fd, buffer, 0, length, size - length);
+    const lines = buffer.toString('utf8').split('\n').filter(Boolean);
+    if (size > length) lines.shift(); // first line may be incomplete
+    if (!lines.length) throw Error('No complete prior observation');
+    return JSON.parse(lines.at(-1));
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+export function compareActivity(current, previous) {
+  const old = current.legacyAlias;
+  const prevOld = previous?.legacyAlias;
+  const currentFile = current.legacyHistory;
+  const previousFile = previous?.legacyHistory;
+  const stablePid = old && prevOld && old.pid === prevOld.pid;
+  const stableInode = currentFile && previousFile && currentFile.inode === previousFile.inode;
+  const callDelta = stablePid ? old.calls - prevOld.calls : null;
+  const historyBytesDelta = stableInode ? currentFile.bytes - previousFile.bytes : null;
+  const callsIncreased = callDelta !== null && callDelta > 0;
+  const fileGrew = historyBytesDelta !== null && historyBytesDelta > 0;
+  const baselineChanged = Boolean(previous && (
+    !stablePid || !stableInode || callDelta < 0 || historyBytesDelta < 0
+  ));
+  return {
+    ...current,
+    comparedTo: previous?.at || null,
+    legacyCallsDelta: callDelta,
+    legacyHistoryBytesDelta: historyBytesDelta,
+    legacyActivityDetected: !previous || baselineChanged ? null : (callsIncreased || fileGrew),
+    lastObservedLegacyActivityAt: callsIncreased || fileGrew
+      ? current.at : (previous?.lastObservedLegacyActivityAt || null),
+    // A PID reset or changed file identity invalidates the prior baseline.
+    baselineChanged,
+    retirementAuthorized: false,
+  };
+}
+
 export async function observe() {
   // Dynamic import keeps tests of the parser independent of MCP SDK installs.
   const [{ Client }, { StreamableHTTPClientTransport }] = await Promise.all([
@@ -55,9 +107,11 @@ export async function observe() {
   }
   if (!status.includes('PERSISTENT CONNECTIONS')) throw Error('Unexpected Kitsune status format');
   const configDir = path.join(os.homedir(), '.claude-server-commander');
-  const observation = makeObservation(status, path.join(configDir, 'tool-history.jsonl'));
-  if (!observation.upgradedAlias) throw Error('Upgraded Kitsune stdio alias missing');
+  const fresh = makeObservation(status, path.join(configDir, 'tool-history.jsonl'));
+  if (!fresh.upgradedAlias) throw Error('Upgraded Kitsune stdio alias missing');
   const filename = path.join(configDir, 'legacy-alias-observer.jsonl');
+  const previous = readLastObservation(filename);
+  const observation = compareActivity(fresh, previous);
   fs.mkdirSync(configDir, { recursive: true, mode: 0o700 });
   const fd = fs.openSync(filename, 'a', 0o600);
   try {

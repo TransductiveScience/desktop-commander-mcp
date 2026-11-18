@@ -1,0 +1,14 @@
+[Unit]
+Description=Incremental Base64 archive catch-up for legacy Desktop Commander tool history
+Documentation=https://github.com/TransductiveScience/desktop-commander-mcp/blob/i9es-runtime/docs/base64-mcp-transport.md
+ConditionPathExists=/home/ned/.claude-server-commander/tool-history.jsonl
+ConditionPathExists=/home/ned/.local/opt/desktop-commander-mcp/scripts/catchup-legacy-history.cjs
+
+[Service]
+Type=oneshot
+ExecStart=/home/linuxbrew/.linuxbrew/bin/node /home/ned/.local/opt/desktop-commander-mcp/scripts/catchup-legacy-history.cjs /home/ned/.claude-server-commander/tool-history.jsonl /home/ned/.claude-server-commander/legacy-opaque-deltas 1713763 267668a7eda5505e89a602d6969a6aa1755fddde49774231a580ea59824c8147
+TimeoutStartSec=45
+Nice=10
+IOSchedulingClass=idle
+# Read-only access to the legacy source, write-only new immutable delta files.
+# Never stop or restart other MCP instances as part of this migration.

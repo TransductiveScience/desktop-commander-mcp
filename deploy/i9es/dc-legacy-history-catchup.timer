@@ -1,0 +1,11 @@
+[Unit]
+Description=Capture legacy Desktop Commander history append-only deltas every five minutes
+
+[Timer]
+OnCalendar=*:0/5
+AccuracySec=30s
+Persistent=true
+Unit=dc-legacy-history-catchup.service
+
+[Install]
+WantedBy=timers.target
